@@ -1,9 +1,10 @@
-import numpy as np 
+import numpy as np
 
 
-def pyscf_fix_l1(fock, frame, orbs):
-    # pyscf stores l=1 terms in a xyz order, corresponding to (m=1, 0, -1).
-    # this converts into a canonical form where m is sorted as (-1, 0,1)
+###########  I/O UTILITIES ##############
+def fix_pyscf_l1(fock, frame, orbs):
+    """ pyscf stores l=1 terms in a xyz order, corresponding to (m=1, 0, -1).
+        this converts into a canonical form where m is sorted as (-1, 0,1) """
     idx = []
     iorb = 0;
     atoms = list(frame.symbols)
@@ -20,12 +21,17 @@ def pyscf_fix_l1(fock, frame, orbs):
                 cur = (n,l)
     return fock[idx][:,idx]
 
-def do_lowdin(fock, s):
-    # lowdin orthogonalization
+########### HAMILTONIAN MANIPULATION ###########
+def lowdin_orthogonalize(fock, s):
+    """
+    lowdin orthogonalization of a fock matrix computing the square root of the overlap matrix
+    """
     eva, eve = np.linalg.eigh(s)
     sm12 = eve @ np.diag(1.0/np.sqrt(eva)) @ eve.T
     return sm12 @ fock @ sm12
 
+
+########## ORBITAL INDEXING ##############
 def orbs_base(orbs):
     # converts list of orbitals into an index to access different sub-blocks
     norbs = 0
@@ -40,24 +46,11 @@ def orbs_base(orbs):
             el_dict[(na+io_base[el], la)] = el
             norbs+=1
 
-
     return io_base, el_dict
 
-def orbs_elements(orbs):
-    norbs = 0
-    el_dict = {}
-    for el in orbs.keys():
-        cur = 0
-        io_base[el] = norbs
-        for na, la, ma in orbs[el]:
-            if na > cur:
-                norbs+=1
-                cur = na
-    return io_base
-
-def pyscf_to_blocks(fock, frame, orbs):
-    """ splits a pyscf matrix to (uncoupled momentum) orbital blocks.
-    NB - assumes the l=1 terms have already been made canonical """
+############ matrix/block manipulations ###############
+def matrix_to_blocks(fock, frame, orbs):
+    """ splits an atomic orbital matrix to (uncoupled momentum) orbital blocks. """
     # maps atom types to different n indices
     io_base, _ = orbs_base(orbs)
 
@@ -67,6 +60,7 @@ def pyscf_to_blocks(fock, frame, orbs):
     offdlist_m = {}
     heterolist = {}
 
+    # creates storage. these are the blocks of the matrix we'll have to fill up later
     lorbs = []
     for el_a in orbs.keys():
         for ia, a in enumerate(orbs[el_a]):
@@ -118,6 +112,81 @@ def pyscf_to_blocks(fock, frame, orbs):
                         blockji= fock[kj+ia:kj+ia+2*la+1, ki+ib:ki+ib+2*lb+1]
                         offdlist_p[orb].append((blockij+blockji)/np.sqrt(2))
                         offdlist_m[orb].append((blockij-blockji)/np.sqrt(2))
+                    elif(el_a != el_b):
+                        heterolist[orb].append(blockij)
+                kj += len(orbs[el_b])
+        ki += len(orbs[el_a])
+
+    # stores as ndarray for more flexible indexing
+    for orb in lorbs:
+        for d in [diaglist, offdlist_p, offdlist_m, heterolist]:
+            if orb in d:
+                d[orb] = np.asarray(d[orb])
+
+    return dict( diag=diaglist, offd_p=offdlist_p, offd_m=offdlist_m, hete=heterolist)
+
+def matrix_to_ij_indices(fock, frame, orbs):
+    """ Creates indices to the atoms involved in each block """
+    # maps atom types to different n indices
+    io_base, _ = orbs_base(orbs)
+
+    # prepares storage
+    diaglist = {}
+    offdlist_p = {}
+    offdlist_m = {}
+    heterolist = {}
+
+    # creates storage. these are the blocks of the matrix we'll have to fill up later
+    lorbs = []
+    for el_a in orbs.keys():
+        for ia, a in enumerate(orbs[el_a]):
+            na, la, ma = a
+            na += io_base[el_a] # adds element offset
+            for el_b in orbs.keys():
+                for ib, b in enumerate(orbs[el_b]):
+                    nb, lb, mb = b
+                    nb += io_base[el_b] # adds element offset
+                    if ( (nb>na or (nb==na and lb>=la)) and
+                        not (na,la,nb,lb) in lorbs ):
+                        orb = (na,la,nb,lb)
+                        lorbs.append(orb)
+                        if el_a == el_b:
+                            diaglist[orb] = []
+                            offdlist_p[orb] = []
+                            offdlist_m[orb] = []
+                        else:
+                            heterolist[orb] = []
+
+
+    # reads in and partitions into blocks
+    ki = 0
+    nat = len(frame.numbers)
+    for i in range(nat):
+        el_a = frame.symbols[i]
+        cur_a = ()
+        for ia, oa in enumerate(orbs[el_a]):
+            na, la, ma = oa
+            na += io_base[el_a]
+            # we read the Hamiltonian in blocks
+            if (cur_a == (na,la)): continue
+            cur_a = (na,la)
+            kj = 0
+            for j in range(nat):
+                el_b = frame.symbols[j]
+                cur_b = ()
+                for ib, ob in enumerate(orbs[el_b]):
+                    nb, lb, mb = ob
+                    nb += io_base[el_b] # adds element offset
+                    if (cur_b == (nb,lb)): continue  # only read at the beginning of each m block
+                    cur_b = (nb,lb)
+                    if (nb<na or (nb==na and lb<la)): continue
+                    orb = (na,la,nb,lb)
+                    blockij = (i,j)
+                    if (i==j):
+                        diaglist[orb].append(blockij)
+                    elif (i<j and el_a == el_b):
+                        offdlist_p[orb].append(blockij)
+                        offdlist_m[orb].append(blockij)
                     elif(el_a != el_b):
                         heterolist[orb].append(blockij)
                 kj += len(orbs[el_b])

@@ -17,11 +17,23 @@ from skcosmo.sample_selection import CUR, FPS
 from ncnice import *
 
 # reads structure and matrices
-frame = read("data/qm7-example-structure.xyz", ":")
-fock = np.load("data/qm7-example-fock-pyscf.npy", allow_pickle=True)
-over = np.load("data/qm7-example-over-pyscf.npy", allow_pickle=True)
+frame = read("data/qm7-example-structure.xyz", ":")[0]
+fock = np.load("data/qm7-example-fock-pyscf.npy", allow_pickle=True)[0]
+over = np.load("data/qm7-example-over-pyscf.npy", allow_pickle=True)[0]
 orbs = json.load(open("data/qm7-example-orbs.json","r"))
 
+# converts matrices in canonical form, and orthogonalizes the hamiltonian
+fock = fix_pyscf_l1(fock, frame, orbs)
+over = fix_pyscf_l1(over, frame, orbs)
+ofock = lowdin_orthogonalize(fock, over)
+
+# start computing CG stuff, and convert targets in coupled form
+
+ofock_blocks = matrix_to_blocks(fock, frame, orbs)
+ii = matrix_to_ij_indices(fock, frame, orbs)
+print(ii["hete"][(3,1,11,0)])
+
+# spherical expansion parameters
 spherical_expansion_hypers = {
     "interaction_cutoff": 7,
     "max_radial": 6,

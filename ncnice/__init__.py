@@ -1,2 +1,3 @@
 from .models import FockRegression
-from .hamiltonians import pyscf_fix_l1, orbs_base, orbs_elements, pyscf_to_blocks
+from .hamiltonians import ( fix_pyscf_l1, lowdin_orthogonalize,
+    orbs_base, matrix_to_blocks, matrix_to_ij_indices )
