@@ -200,10 +200,9 @@ def matrix_to_ij_indices(fock, frame, orbs):
 
     return dict( diag=diaglist, offd_p=offdlist_p, offd_m=offdlist_m, hete=heterolist)
 
-
-def blocks_to_pyscf(blocks, frame, orbs):
-    """ assembles (uncoupled momentum) orbital blocks into a pyscf-storage matrix
-    NB - the l=1 terms are stored in canonical order """
+def blocks_to_matrix(blocks, frame, orbs):
+    """ assembles (uncoupled momentum) orbital blocks into a matrix form
+    NB - the l terms are stored in canonical order, m=-l..l """
 
     io_base, _ = orbs_base(orbs)
     norbs = 0
@@ -265,7 +264,7 @@ def blocks_to_pyscf(blocks, frame, orbs):
         ki += len(orbs[el_a])
     return unfock
 
-def to_coupled(dcoef, cg):
+def couple_blocks(dcoef, cg):
     """ converts coefficients (fock matrix blocks) from uncoupled to coupled form """
     dccoef = {}
     for dk in dcoef.keys():
@@ -280,7 +279,7 @@ def to_coupled(dcoef, cg):
                     dccoef[dk][k][L] = np.asarray([el[L] for el in coupled])
     return dccoef
 
-def to_decoupled(dccoef, cg):
+def decouple_blocks(dccoef, cg):
     """ converts coefficients (fock matrix blocks) from coupled to uncoupled form """
     dcoef = {}
     for dk in dccoef.keys():

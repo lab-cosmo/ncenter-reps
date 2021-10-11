@@ -27,12 +27,6 @@ fock = fix_pyscf_l1(fock, frame, orbs)
 over = fix_pyscf_l1(over, frame, orbs)
 ofock = lowdin_orthogonalize(fock, over)
 
-# start computing CG stuff, and convert targets in coupled form
-
-ofock_blocks = matrix_to_blocks(fock, frame, orbs)
-ii = matrix_to_ij_indices(fock, frame, orbs)
-print(ii["hete"][(3,1,11,0)])
-
 # spherical expansion parameters
 spherical_expansion_hypers = {
     "interaction_cutoff": 7,
@@ -48,6 +42,54 @@ spherical_expansion_hypers = {
     "expansion_by_species_method": "user defined"
 }
 
+# start computing CG stuff, and convert targets in coupled form
+mycg = ClebschGordanReal(spherical_expansion_hypers["max_angular"])
+
+ofock_blocks = matrix_to_blocks(ofock, frame, orbs)
+ofock_coupled = couple_blocks(ofock_blocks, mycg)
+
+print("Computing features")
+feats = do_full_features([frame], orbs, spherical_expansion_hypers, 2, mycg, scale=1e3)
+
+print("Fitting model")
+FR = FockRegression(orbs, alpha=1e-8, fit_intercept="auto")
+FR.fit(feats, ofock_coupled)
+
+print("Predicting model")
+pred_coupled = FR.predict(feats)
+pred = blocks_to_matrix(decouple_blocks(pred_coupled, mycg), frame, orbs)
+
+print("RMSE Hamiltonian", np.linalg.norm(ofock-pred)/np.sqrt(len(ofock)))
+print("MAE Eigenvalues", np.mean(np.abs(np.linalg.eigvalsh(ofock)-np.linalg.eigvalsh(pred))))
 
 
+# now we do transformed structures and check all is well
 
+print("Checking rotations")
+mywd = WignerDReal(spherical_expansion_hypers["max_angular"], *np.random.uniform(0,np.pi,size=3)) # random rotation
+frame_rot = frame.copy()
+mywd.rotate_frame(frame_rot)
+
+feats_rot = do_full_features([frame_rot], orbs, spherical_expansion_hypers, 2, mycg, scale=1e3)
+pred_rot = blocks_to_matrix(decouple_blocks(FR.predict(feats_rot), mycg), frame, orbs)
+print("RMSE Hamiltonian (pred)", np.linalg.norm(pred_rot-pred)/np.sqrt(len(ofock)))
+print("MAE Eigenvalues (pred)", np.mean(np.abs(np.linalg.eigvalsh(pred_rot)-np.linalg.eigvalsh(pred))))
+
+print("Checking inversion")
+frame_inv = frame.copy()
+frame_inv.positions = 100-frame.positions
+feats_inv = do_full_features([frame_inv], orbs, spherical_expansion_hypers, 2, mycg, scale=1e3)
+pred_inv = blocks_to_matrix(decouple_blocks(FR.predict(feats_inv), mycg), frame, orbs)
+print("RMSE Hamiltonian (pred)", np.linalg.norm(pred_inv-pred)/np.sqrt(len(ofock)))
+print("MAE Eigenvalues (pred)", np.mean(np.abs(np.linalg.eigvalsh(pred_inv)-np.linalg.eigvalsh(pred))))
+
+print("Checking atom permutations")
+iperm = np.arange(len(frame.numbers), dtype=int)
+np.random.shuffle(iperm)
+frame_prm = frame.copy()
+frame_prm.numbers = frame_prm.numbers[iperm]
+frame_prm.positions = frame_prm.positions[iperm]
+feats_prm = do_full_features([frame_prm], orbs, spherical_expansion_hypers, 2, mycg, scale=1e3)
+pred_prm = blocks_to_matrix(decouple_blocks(FR.predict(feats_prm), mycg), frame, orbs)
+print("RMSE Hamiltonian (pred)", np.linalg.norm(pred_prm-pred)/np.sqrt(len(ofock)))
+print("MAE Eigenvalues (pred)", np.mean(np.abs(np.linalg.eigvalsh(pred_prm)-np.linalg.eigvalsh(pred))))
