@@ -5,16 +5,17 @@ import itertools
 from copy import deepcopy
 from rascal.utils import spherical_expansion_reshape, lm_slice
 from rascal.representations import SphericalExpansion
+
 def get_gij(frame, spex, hypers):
     # computes <nlm|rho_ij^0; g> - the basic pair equivariant
     # get one center at a time, just to show the logic
-    gij = []    
+    gij = []
     for i in range(len(frame.numbers)):
         sel = frame.copy()
         sel.numbers[i] = 99 # fictitious index just to tag the neighbor
         tmp = spherical_expansion_reshape(spex.transform(sel).get_features(spex), **hypers)
         gij.append(tmp[:,-1,:])
-    return np.swapaxes(np.asarray(gij), 0, 1)    
+    return np.swapaxes(np.asarray(gij), 0, 1)
 
 def get_gij_fast(frame, spex, hypers):
     # computes <nlm|rho_ij^0; g> - the basic pair equivariant
@@ -26,8 +27,8 @@ def get_gij_fast(frame, spex, hypers):
 def mk_rho1ij_fast(rfeats, gij, cg):
     """ computes |rho^1_ij> - the pair invariant"""
     # natom, natom, nel, nmax, nmax, lmax+1
-    shape = (rfeats.shape[0],   rfeats.shape[0],  
-             rfeats.shape[1],  rfeats.shape[2], 
+    shape = (rfeats.shape[0],   rfeats.shape[0],
+             rfeats.shape[1],  rfeats.shape[2],
              gij.shape[2],  int(np.sqrt(rfeats.shape[3])))
     rho1ij = np.zeros(shape)
 
@@ -136,7 +137,7 @@ def mk_rho2ijlambda_fast(rho2i, gij, L, cg, prho2i): #, rho2i_pca=None):
         for l2 in range(lmax+1):   # can't use symmetry when combining rhoi and rhoij features
             if abs(l2 - l1) > L or l2 + l1 < L:
                 continue
-            nl += rho2i[l1].shape[-2]   # l-soap indices            
+            nl += rho2i[l1].shape[-2]   # l-soap indices
 
     # natom, natom, nel, nmax, nmax, nl, M
     # if we do PCA, all the rho2 indices are collapsed

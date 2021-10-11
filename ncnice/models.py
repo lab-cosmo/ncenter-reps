@@ -6,6 +6,7 @@ from sklearn.model_selection import GridSearchCV
 from sklearn.base import RegressorMixin, BaseEstimator
 from time import time
 import scipy
+
 # avoid polluting output with CV failures
 import warnings
 warnings.filterwarnings('ignore', category=scipy.linalg.LinAlgWarning)
@@ -13,11 +14,11 @@ warnings.filterwarnings('ignore', category=sklearn.exceptions.FitFailedWarning)
 warnings.filterwarnings('ignore', category=UserWarning)
 
 class SASplitter:
-    """ CV splitter that takes into account the presence of "L blocks" 
+    """ CV splitter that takes into account the presence of "L blocks"
     associated with symmetry-adapted regression. Basically, you can trick conventional
-    regression schemes to work on symmetry-adapted data y^M_L(A_i) by having the (2L+1) 
+    regression schemes to work on symmetry-adapted data y^M_L(A_i) by having the (2L+1)
     angular channels "unrolled" into a flat array. Then however splitting of train/test
-    or cross validation must not "cut" across the M block. This takes care of that. 
+    or cross validation must not "cut" across the M block. This takes care of that.
     """
     def __init__(self, L, cv=2):
         self.L = L
