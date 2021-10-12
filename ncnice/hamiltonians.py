@@ -297,7 +297,7 @@ def decouple_blocks(dccoef, cg):
             dcoef[dk][k] = np.asarray(decoup)
     return dcoef
 
-def focks_to_blocks(focks, frames, orbs, cg, progress = (lambda x: x)):
+def matrix_list_to_blocks(focks, frames, orbs, cg, progress = (lambda x: x)):
     """ Computes coupled-momemtum blocks of the matrices for a bunch of frames,
     collecting all the learning targets in a single list. Also returns indices
     that allows extracting the blocks from each matrix. """
@@ -328,7 +328,8 @@ def focks_to_blocks(focks, frames, orbs, cg, progress = (lambda x: x)):
     return blocks, slices
 
 def get_block_idx(frame_idx, slices):
-    """ returns a dictionary with the indices associated with the hamiltonians of the frames in frame_idx """
+    """ returns a dictionary with the indices associated with
+        the hamiltonians of the frames in frame_idx """
     idx_slices = { k:{} for k in slices[0].keys() }
     for i in frame_idx:
         for k in slices[i].keys():
@@ -355,16 +356,7 @@ def coupled_block_slice(dccoef, slices):
                 dcoef[dk][orb][L] = dccoef[dk][orb][L][sl]
     return dcoef
 
-def slice_fraction(blocks, tf = 0.5):
-    train_slices = {}
-    for k in blocks.keys():
-        train_slices[k] = {}
-        for orb in blocks[k]:
-            L0 = list(blocks[k][orb].keys())[0]
-            train_slices[k][orb] = slice(0,int(len(blocks[k][orb][L0])*tf))
-    return train_slices
-
-def blocks_to_focks(blocks, frames, slices, orbs, cg):
+def blocks_to_matrix_list(blocks, frames, slices, orbs, cg):
     """ Transforms coupled-momentum blocks to a list of fock matrices. """
     focks = []
     ntot = 0
@@ -373,7 +365,7 @@ def blocks_to_focks(blocks, frames, slices, orbs, cg):
         focks.append(blocks_to_pyscf(dec, frames[ifr], orbs))
     return focks
 
-def block_to_feat(tblock, kblock, lblock, orbs):
+def block_to_feat_index(tblock, kblock, lblock, orbs):
     obase = orbs_base(orbs)
     if tblock != "hete":
         fblock = (obase[1][kblock[0:2]], lblock, (1-2*(kblock[1]%2))*(1-2*(kblock[3]%2))*(1-2*(lblock%2)) )
