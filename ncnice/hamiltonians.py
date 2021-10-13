@@ -302,7 +302,7 @@ def matrix_list_to_blocks(focks, frames, orbs, cg, progress = (lambda x: x)):
     collecting all the learning targets in a single list. Also returns indices
     that allows extracting the blocks from each matrix. """
 
-    blocks = to_coupled(pyscf_to_blocks(focks[0], frames[0], orbs), cg)
+    blocks = couple_blocks(matrix_to_blocks(focks[0], frames[0], orbs), cg)
     slices = [{}]
     for k in blocks.keys():
         slices[0][k] = {}
@@ -310,7 +310,7 @@ def matrix_list_to_blocks(focks, frames, orbs, cg, progress = (lambda x: x)):
             L0 = list(blocks[k][orb].keys())[0]
             slices[0][k][orb] = slice(0, len(blocks[k][orb][L0]))
     for ifr in progress(range(1,len(frames))):
-        fc = to_coupled(pyscf_to_blocks(focks[ifr], frames[ifr], orbs), cg)
+        fc = couple_blocks(matrix_to_blocks(focks[ifr], frames[ifr], orbs), cg)
         slices.append({})
         for k in fc.keys():
             slices[-1][k] = {}
@@ -361,8 +361,8 @@ def blocks_to_matrix_list(blocks, frames, slices, orbs, cg):
     focks = []
     ntot = 0
     for ifr in range(len(slices)):
-        dec = to_decoupled(coupled_block_slice(blocks, slices[ifr]), cg)
-        focks.append(blocks_to_pyscf(dec, frames[ifr], orbs))
+        dec = decouple_blocks(coupled_block_slice(blocks, slices[ifr]), cg)
+        focks.append(blocks_to_matrix(dec, frames[ifr], orbs))
     return focks
 
 def block_to_feat_index(tblock, kblock, lblock, orbs):
@@ -388,3 +388,11 @@ def merge_blocks(lblocks):
                         rblocks[k][b] = np.concatenate([rblocks[k][b], block[k][b]], axis=0)
     return rblocks
 
+def slice_fraction(blocks, tf = 0.5):
+    train_slices = {}
+    for k in blocks.keys():
+        train_slices[k] = {}
+        for orb in blocks[k]:
+            L0 = list(blocks[k][orb].keys())[0]
+            train_slices[k][orb] = slice(0,int(len(blocks[k][orb][L0])*tf))
+    return train_slices
