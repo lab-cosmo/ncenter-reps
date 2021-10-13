@@ -6,7 +6,7 @@ from sklearn.model_selection import GridSearchCV
 from sklearn.base import RegressorMixin, BaseEstimator
 from time import time
 import scipy
-from .hamiltonians import orbs_base
+from hamiltonians import orbs_base
 
 # avoid polluting output with CV failures
 import warnings
