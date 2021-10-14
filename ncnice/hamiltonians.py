@@ -1,5 +1,5 @@
 import numpy as np
-
+from .representations import *
 
 ###########  I/O UTILITIES ##############
 def fix_pyscf_l1(fock, frame, orbs):
@@ -302,7 +302,7 @@ def matrix_list_to_blocks(focks, frames, orbs, cg, progress = (lambda x: x)):
     collecting all the learning targets in a single list. Also returns indices
     that allows extracting the blocks from each matrix. """
 
-    blocks = to_coupled(pyscf_to_blocks(focks[0], frames[0], orbs), cg)
+    blocks = couple_blocks(matrix_to_blocks(focks[0], frames[0], orbs), cg)
     slices = [{}]
     for k in blocks.keys():
         slices[0][k] = {}
@@ -310,7 +310,7 @@ def matrix_list_to_blocks(focks, frames, orbs, cg, progress = (lambda x: x)):
             L0 = list(blocks[k][orb].keys())[0]
             slices[0][k][orb] = slice(0, len(blocks[k][orb][L0]))
     for ifr in progress(range(1,len(frames))):
-        fc = to_coupled(pyscf_to_blocks(focks[ifr], frames[ifr], orbs), cg)
+        fc = couple_blocks(matrix_to_blocks(focks[ifr], frames[ifr], orbs), cg)
         slices.append({})
         for k in fc.keys():
             slices[-1][k] = {}
@@ -361,8 +361,8 @@ def blocks_to_matrix_list(blocks, frames, slices, orbs, cg):
     focks = []
     ntot = 0
     for ifr in range(len(slices)):
-        dec = to_decoupled(coupled_block_slice(blocks, slices[ifr]), cg)
-        focks.append(blocks_to_pyscf(dec, frames[ifr], orbs))
+        dec = decouple_blocks(coupled_block_slice(blocks, slices[ifr]), cg)
+        focks.append(blocks_to_matrix(dec, frames[ifr], orbs))
     return focks
 
 def block_to_feat_index(tblock, kblock, lblock, orbs):
@@ -387,4 +387,174 @@ def merge_blocks(lblocks):
                     elif len(block[k][b])>0:
                         rblocks[k][b] = np.concatenate([rblocks[k][b], block[k][b]], axis=0)
     return rblocks
+
+##############   Features for Hamiltonian learning ############
+def compute_hamiltonian_representations(frames, orbs, hypers, lmax, nu, cg, scale=1,
+                     select_feats = None, half_hete = True,
+                     rhoi_pca = None, rho2i_pca = None,
+                     rhoij_rho2i_pca = None, rhoij_pca = None,
+                     verbose = False
+                     ):
+    """
+        Computes the full set of features needed to learn matrix elements up to lmax.
+        Options are fluid, but here are some that need an explanation:
+
+        select_feats = dict(type=["diag", "offd_m", "offd_p", "hete"], block = ('el1', ['el2',] L, pi) )
+        does the minimal amount of calculation to evaluate the selected block. other terms might be computed as well if they come for free.
+    """
+
+    spex = SphericalExpansion(**hypers)
+    rhoi = compute_rhoi(frames, spex, hypers)
+
+    # compresses further the spherical expansion features across species
+    if rhoi_pca is not None:
+        rhoi = apply_rhoi_pca(rhoi, rhoi_pca)
+
+    # makes sure that the spex used for the pair terms uses adaptive species
+    hypers_ij = deepcopy(hypers)
+    hypers_ij["expansion_by_species_method"] = "structure wise"
+    spex_ij = SphericalExpansion(**hypers_ij)
+
+    tnat = 0
+    els = list(orbs.keys())
+    nel = len(els)
+    # prepare storage
+    elL = list(itertools.product(els,range(lmax+1),[-1,1]))
+    hetL = [ (els[i1], els[i2], L, pi) for i1 in range(nel) for i2 in range((i1+1 if half_hete else 0), nel) for L in range(lmax+1) for pi in [-1,1] ]
+    feats = dict(diag = { L: [] for L in elL },
+                 offd_p = { L: [] for L in elL },
+                 offd_m = { L: [] for L in elL },
+                 hete =   { L: [] for L in hetL },)
+
+    if rhoij_rho2i_pca is None and rho2i_pca is not None:
+        rhoij_rho2i_pca = rho2i_pca
+
+    #before = tracemalloc.take_snapshot()
+    for f in frames:
+        fnat = len(f.numbers)
+        frhoi = rhoi[tnat:tnat+fnat]*scale
+        fgij = compute_gij(f, spex_ij, hypers_ij)*scale
+
+        if (select_feats is None or select_feats["type"]!="diag") and nu == 2:
+            rhonui, prhonui = compute_all_rho2i_lambda(frhoi, cg, rhoij_rho2i_pca)
+        else:
+            rhonui, prhonui = frhoi, None
+
+        for L in range(lmax+1):
+            if select_feats is not None and L>0 and select_feats["block"][-2] != L:
+                continue
+
+            if nu==0:
+                lrhonui, lprhonui = np.ones((fnat, 1, 2*L+1)), np.ones((1))
+            elif nu==1:
+                lrhonui, lprhonui = compute_rho1i_lambda(frhoi, L, cg)
+                if rhoi_pca is not None:
+                    lrhonui, lprhonui = apply_rho1i_pca(lrhonui, lprhonui, rhoi_pca)
+            else:
+                lrhonui, lprhonui = compute_rho2i_lambda(frhoi, L, cg)
+                if rho2i_pca is not None:
+                    lrhonui, lprhonui = apply_rho2i_pca(lrhonui, lprhonui, rho2i_pca)
+
+            if select_feats is None or select_feats["type"]!="diag":
+                if nu==0:
+                    lrhoij, prhoij = compute_rho0ij_lambda(rhonui, fgij, L, cg, prhonui)
+                elif nu==1:
+                    lrhoij, prhoij = compute_rho1ij_lambda(rhonui, fgij, L, cg, prhonui)
+                else:
+                    lrhoij, prhoij = compute_rho2ij_lambda(rhonui, fgij, L, cg, prhonui)
+                if rhoij_pca is not None:
+                    lrhoij, prhoij = apply_rhoij_pca(lrhoij, prhoij, rhoij_pca)
+
+            for i, el in enumerate(els):
+                iel = np.where(f.symbols==el)[0]
+                if len(iel) == 0:
+                    continue
+                if select_feats is not None and el != select_feats["block"][0]:
+                    continue
+
+                for pi in [-1,1]:
+                    wherepi = np.where(lprhonui==pi)[0]
+                    if len(wherepi)==0:
+                        # add a vector of zeros
+                        feats['diag'][(el, L, pi)].append(np.zeros(shape=(len(iel), 1, 2*L+1)))
+                        continue
+                    feats['diag'][(el, L, pi)].append(lrhonui[...,wherepi,:][iel].reshape((len(iel), -1, 2*L+1) ) )
+
+                if select_feats is not None and select_feats["type"]=="diag":
+                    continue
+
+                triu = np.triu_indices(len(iel), 1)
+                ij_up = (iel[triu[0]],iel[triu[1]]) # ij indices, i>j
+                ij_lw = (ij_up[1], ij_up[0]) # ij indices, i<j
+                lrhoij_p = (lrhoij[ij_up] + lrhoij[ij_lw])/np.sqrt(2)
+                lrhoij_m = (lrhoij[ij_up] - lrhoij[ij_lw])/np.sqrt(2)
+                for pi in [-1,1]:
+                    wherepi = np.where(prhoij==pi)[0];
+                    if len(wherepi)==0 or len(ij_up[0])==0:
+                        feats['offd_p'][(el, L, pi)].append( np.zeros((lrhoij_p.shape[0], 1, 2*L+1)) )
+                        feats['offd_m'][(el, L, pi)].append( np.zeros((lrhoij_p.shape[0], 1, 2*L+1)) )
+                        continue
+                    feats['offd_p'][(el, L, pi)].append(lrhoij_p[...,wherepi,:].reshape(lrhoij_p.shape[0], -1, 2*L+1))
+                    feats['offd_m'][(el, L, pi)].append(lrhoij_m[...,wherepi,:].reshape(lrhoij_m.shape[0], -1, 2*L+1))
+
+                if select_feats is not None and select_feats["type"]!="hete":
+                    continue
+                for elb in els[i+1:]:
+                    ielb = np.where(f.symbols==elb)[0]
+                    if len(ielb) == 0:
+                        continue
+                    if select_feats is not None and elb != select_feats["block"][1]:
+                        continue
+
+                    # combines rho_ij and rho_ji
+                    lrhoij_het = lrhoij[iel][:,ielb]
+                    lrhoij_het_rev = np.swapaxes(lrhoij[ielb][:,iel],1,0)
+                    # make a copy and not a slice, so we keep better track
+                    for pi in [-1,1]:
+                        wherepi = np.where(prhoij==pi)[0];
+                        if len(wherepi)==0:
+                            feats['hete'][(el, elb, L, pi)].append(np.zeros((lrhoij_het.shape[0]*lrhoij_het.shape[1],1,2*L+1)))
+                            continue
+                        lrhoij_het_pi = lrhoij_het[...,wherepi,:]
+                        lrhoij_het_rev_pi = lrhoij_het_rev[...,wherepi,:]
+                        feats['hete'][(el, elb, L, pi)].append(
+                            np.concatenate([
+                            lrhoij_het_pi.reshape(
+                                (lrhoij_het.shape[0]*lrhoij_het.shape[1],-1,2*L+1) )
+                            ,
+                            lrhoij_het_rev_pi.reshape(
+                                (lrhoij_het_rev.shape[0]*lrhoij_het_rev.shape[1],-1,2*L+1) )
+                            ], axis=-2)
+                        )
+                    #del(lrhoij_het)
+                #del(lrhoij_p, lrhoij_m)
+            #del(lrhoij, lrho2)
+        tnat+=fnat
+
+    #mid = tracemalloc.take_snapshot()
+    #top_stats = mid.compare_to(before, 'lineno')
+    #print("[ Top 10 differences ]")
+    #for stat in top_stats[:10]:  print(stat)
+
+
+    # cleans up combining frames blocks into single vectors - splitting also odd and even blocks
+    if verbose: print("combining", get_size(feats))
+    for k in feats.keys():
+        for b in list(feats[k].keys()):
+            if len(feats[k][b]) == 0:
+                continue
+            block = np.vstack(feats[k][b])
+            feats[k].pop(b)
+            if len(block) == 0:
+                continue
+
+            feats[k][b] = block.reshape((block.shape[0], -1, 1+2*b[-2]))
+
+    if verbose: print("compare ", get_size(feats))
+    if verbose: print("done", gc.collect())
+    #then = tracemalloc.take_snapshot()
+    #top_stats = then.compare_to(mid, 'lineno')
+    #print("[ Top 10 differences ]")
+    #for stat in top_stats[:10]:  print(stat)
+    return feats
 
