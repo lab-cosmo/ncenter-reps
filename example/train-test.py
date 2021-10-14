@@ -97,11 +97,11 @@ rho1ij_l = compute_rho1ij_lambda(rhoi, gij, spex_hypers["max_angular"], mycg)
 rho2ij_l = compute_rho2ij_lambda(rho2i_l_all, gij, spex_hypers["max_angular"], mycg, prho2i_l_all)
 
 print("Regression model (nu=0 no PCA)")
-feats = compute_hamiltonian_representations(tqdm_reusable(frames, desc="features", leave=False),
+feats_nu0 = compute_hamiltonian_representations(tqdm_reusable(frames, desc="features", leave=False),
                         orbs, spex_hypers, 2, nu=0, cg=mycg, scale=1e3)
 
-FR.fit(feats, ofock_blocks, train_slices, progress=tqdm)
-pred_blocks = FR.predict(feats, progress=tqdm)
+FR.fit(feats_nu0, ofock_blocks, train_slices, progress=tqdm)
+pred_blocks = FR.predict(feats_nu0, progress=tqdm)
 pred_ofocks = blocks_to_matrix_list(pred_blocks, frames, slices_idx, orbs, mycg)
 
 mse_train = 0
@@ -116,11 +116,11 @@ print("Train RMSE: ", np.sqrt(mse_train))
 print("Test RMSE: ", np.sqrt(mse_test))
 
 print("Regression model (nu=1 no PCA)")
-feats = compute_hamiltonian_representations(tqdm_reusable(frames, desc="features", leave=False),
+feats_nu1 = compute_hamiltonian_representations(tqdm_reusable(frames, desc="features", leave=False),
                         orbs, spex_hypers, 2, nu=1, cg=mycg, scale=1e3)
 
-FR.fit(feats, ofock_blocks, train_slices, progress=tqdm)
-pred_blocks = FR.predict(feats, progress=tqdm)
+FR.fit(feats_nu1, ofock_blocks, train_slices, progress=tqdm)
+pred_blocks = FR.predict(feats_nu1, progress=tqdm)
 pred_ofocks = blocks_to_matrix_list(pred_blocks, frames, slices_idx, orbs, mycg)
 
 mse_train = 0
@@ -154,14 +154,33 @@ rho2ij_pca, rho2ij_pca_eva = compute_rhoij_pca(frames, spex_hypers, mycg, nu=2, 
 print("rho2_ij singular values", rho2ij_pca_eva[(0,1)]/rho2ij_pca_eva[(0,1)][0])
 
 print("Regression model (nu=2, with PCA)")
-feats = compute_hamiltonian_representations(tqdm_reusable(frames, desc="features", leave=False),
+feats_nu2 = compute_hamiltonian_representations(tqdm_reusable(frames, desc="features", leave=False),
                         orbs, spex_hypers, 2, nu=2, cg=mycg, scale=1e3,
                         rhoi_pca = rhoi_pca, rho2i_pca = rho2i_pca,
                         rhoij_pca = rho2ij_pca
                         )
 
-FR.fit(feats, ofock_blocks, train_slices, progress=tqdm)
-pred_blocks = FR.predict(feats, progress=tqdm)
+FR.fit(feats_nu2, ofock_blocks, train_slices, progress=tqdm)
+pred_blocks = FR.predict(feats_nu2, progress=tqdm)
+pred_ofocks = blocks_to_matrix_list(pred_blocks, frames, slices_idx, orbs, mycg)
+
+mse_train = 0
+for i in itrain:
+    mse_train += np.sum((pred_ofocks[i] - ofocks[i])**2)/len(ofocks[i])/len(itrain)
+
+mse_test = 0
+for i in itest:
+    mse_test += np.sum((pred_ofocks[i] - ofocks[i])**2)/len(ofocks[i])/len(itest)
+
+print("Train RMSE: ", np.sqrt(mse_train))
+print("Test RMSE: ", np.sqrt(mse_test))
+
+
+print("Combined regression model nu=1+2+3")
+feats_comb = merge_blocks([feats_nu0, feats_nu1, feats_nu2], axis=1)
+
+FR.fit(feats_comb, ofock_blocks, train_slices, progress=tqdm)
+pred_blocks = FR.predict(feats_comb, progress=tqdm)
 pred_ofocks = blocks_to_matrix_list(pred_blocks, frames, slices_idx, orbs, mycg)
 
 mse_train = 0

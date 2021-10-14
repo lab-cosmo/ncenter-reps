@@ -373,7 +373,7 @@ def block_to_feat_index(tblock, kblock, lblock, orbs):
         fblock = (obase[1][kblock[0:2]], obase[1][kblock[2:4]], lblock, (1-2*(kblock[1]%2))*(1-2*(kblock[3]%2))*(1-2*(lblock%2)))
     return fblock
 
-def merge_blocks(lblocks):
+def merge_blocks(lblocks, axis=0):
     """ Takes a list of block dictionaries and consolidates into a single list """
     rblocks = {}
     for block in lblocks:
@@ -385,7 +385,7 @@ def merge_blocks(lblocks):
                     if not b in rblocks[k] or len(rblocks[k][b])==0:
                         rblocks[k][b] = block[k][b]
                     elif len(block[k][b])>0:
-                        rblocks[k][b] = np.concatenate([rblocks[k][b], block[k][b]], axis=0)
+                        rblocks[k][b] = np.concatenate([rblocks[k][b], block[k][b]], axis=axis)
     return rblocks
 
 ##############   Features for Hamiltonian learning ############
