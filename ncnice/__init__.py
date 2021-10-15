@@ -1,6 +1,7 @@
 from .models import FockRegression
 from .hamiltonians import ( fix_pyscf_l1, lowdin_orthogonalize,
     orbs_base, matrix_to_blocks, matrix_to_ij_indices,
+    block_to_feat_index,
     matrix_list_to_blocks, get_block_idx, blocks_to_matrix_list,
     couple_blocks, blocks_to_matrix, decouple_blocks, merge_blocks,
     compute_hamiltonian_representations
