@@ -448,8 +448,6 @@ def compute_hamiltonian_representations(frames, orbs, hypers, lmax, nu, cg, scal
                 lrhonui, lprhonui = np.ones((fnat, 1, 2*L+1)), np.ones((1))
             elif nu==1:
                 lrhonui, lprhonui = compute_rho1i_lambda(frhoi, L, cg)
-                if rhoi_pca is not None:
-                    lrhonui, lprhonui = apply_rho1i_pca(lrhonui, lprhonui, rhoi_pca)
             else:
                 lrhonui, lprhonui = compute_rho2i_lambda(frhoi, L, cg)
                 if rho2i_pca is not None:
