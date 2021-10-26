@@ -22,7 +22,7 @@ fock = np.load("data/qm7-example-fock-pyscf.npy", allow_pickle=True)[0]
 over = np.load("data/qm7-example-over-pyscf.npy", allow_pickle=True)[0]
 orbs = json.load(open("data/qm7-example-orbs.json","r"))
 
-# converts matrices in canonical form, and orthogonalizes the hamiltonian
+# converts matrices in canonical form, and orthogonalizes the Hamiltonian
 fock = fix_pyscf_l1(fock, frame, orbs)
 over = fix_pyscf_l1(over, frame, orbs)
 ofock = lowdin_orthogonalize(fock, over)
