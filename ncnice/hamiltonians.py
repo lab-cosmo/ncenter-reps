@@ -539,8 +539,10 @@ def compute_hamiltonian_representations(frames, orbs, hypers, lmax, nu, cg, scal
                 lrhoij_p = (lrhoij[ij_up] + lrhoij[ij_lw])/np.sqrt(2)
                 lrhoij_m = (lrhoij[ij_up] - lrhoij[ij_lw])/np.sqrt(2)
                 for pi in [-1,1]:
+                    if len(ij_up[0])==0:
+                        continue
                     wherepi = np.where(prhoij==pi)[0];
-                    if len(wherepi)==0 or len(ij_up[0])==0:
+                    if len(wherepi)==0:
                         feats['offd_p'][(el, L, pi)].append( np.zeros((lrhoij_p.shape[0], 1, 2*L+1)) )
                         feats['offd_m'][(el, L, pi)].append( np.zeros((lrhoij_p.shape[0], 1, 2*L+1)) )
                         continue
@@ -588,7 +590,6 @@ def compute_hamiltonian_representations(frames, orbs, hypers, lmax, nu, cg, scal
 
 
     # cleans up combining frames blocks into single vectors - splitting also odd and even blocks
-    if verbose: print("combining", get_size(feats))
     for k in feats.keys():
         for b in list(feats[k].keys()):
             if len(feats[k][b]) == 0:
@@ -600,8 +601,6 @@ def compute_hamiltonian_representations(frames, orbs, hypers, lmax, nu, cg, scal
 
             feats[k][b] = block.reshape((block.shape[0], -1, 1+2*b[-2]))
 
-    if verbose: print("compare ", get_size(feats))
-    if verbose: print("done", gc.collect())
     #then = tracemalloc.take_snapshot()
     #top_stats = then.compare_to(mid, 'lineno')
     #print("[ Top 10 differences ]")
