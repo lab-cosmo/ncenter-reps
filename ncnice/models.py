@@ -424,6 +424,7 @@ class FockRegression:
 
     def fit(self, feats, fock_bc, slices=None, progress=None):
         self._models = {}
+        self.cv_stats_ = {}
         for k in fock_bc.keys():
             self._models[k] = {}
             pkeys = fock_bc[k].keys()
@@ -460,6 +461,7 @@ class FockRegression:
                     self._models[k][orb][L] = self._model_template(L, *self._args, **self._kwargs)
                     # determines parity of the block
                     self._models[k][orb][L].fit(feats[k][fblock][sl], tgt, X0=feats[k][fblock[:-2]+(0, 1)][sl])
+                    self.cv_stats_[(k, orb,L)] = self._models[k][orb][L].cv_stats
 
 
     def predict(self, feats, progress=None):
