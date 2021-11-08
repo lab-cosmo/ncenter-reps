@@ -373,7 +373,7 @@ def block_to_feat_index(tblock, kblock, lblock, orbs):
         fblock = (obase[1][kblock[0:2]], obase[1][kblock[2:4]], lblock, (1-2*(kblock[1]%2))*(1-2*(kblock[3]%2))*(1-2*(lblock%2)))
     return fblock
 
-def merge_blocks(lblocks, axis=0):
+def merge_features(lblocks, axis=0):
     """ Takes a list of block dictionaries and consolidates into a single list """
     rblocks = {}
     for block in lblocks:
@@ -387,6 +387,12 @@ def merge_blocks(lblocks, axis=0):
                     elif len(block[k][b])>0:
                         rblocks[k][b] = np.concatenate([rblocks[k][b], block[k][b]], axis=axis)
     return rblocks
+
+def normalize_features(block, norm=1):
+    """ Takes a list of block dictionaries and normalize them (in place)"""
+    for k in block:    
+        for b in block[k]:
+            block[k][b] *= norm/np.sqrt((block[k][b].reshape((block[k][b].shape[0],-1))**2).sum(axis=1).mean(axis=0))
 
 ###############   SAPH generation #########################
 def compute_saph(fock, over, frame, orbs, sel_types, n_core, orthogonality_threshold=1e-8):

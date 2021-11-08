@@ -177,7 +177,7 @@ print("Test RMSE: ", np.sqrt(mse_test))
 
 
 print("Combined regression model nu=1+2+3")
-feats_comb = merge_blocks([feats_nu0, feats_nu1, feats_nu2], axis=1)
+feats_comb = merge_features([feats_nu0, feats_nu1, feats_nu2], axis=1)
 
 FR.fit(feats_comb, ofock_blocks, train_slices, progress=tqdm)
 pred_blocks = FR.predict(feats_comb, progress=tqdm)
