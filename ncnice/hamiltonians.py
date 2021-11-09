@@ -373,26 +373,39 @@ def block_to_feat_index(tblock, kblock, lblock, orbs):
         fblock = (obase[1][kblock[0:2]], obase[1][kblock[2:4]], lblock, (1-2*(kblock[1]%2))*(1-2*(kblock[3]%2))*(1-2*(lblock%2)))
     return fblock
 
-def merge_features(lblocks, axis=0):
+def merge_features(lblocks, axis=0, lowmem=False):
     """ Takes a list of block dictionaries and consolidates into a single list """
+    # first we create block structure
     rblocks = {}
     for block in lblocks:
         for k in block:
             if not k in rblocks:
-                rblocks[k] = block[k]
+                rblocks[k] = {}
             else:
                 for b in block[k]:
                     if not b in rblocks[k] or len(rblocks[k][b])==0:
-                        rblocks[k][b] = block[k][b]
-                    elif len(block[k][b])>0:
-                        rblocks[k][b] = np.concatenate([rblocks[k][b], block[k][b]], axis=axis)
+                        rblocks[k][b] = []
+    # and then we fill it
+    for k in rblocks:
+        for b in rblocks[k]:
+            nbl = []
+            for block in lblocks:
+                if len(block[k][b])>0:
+                    nbl.append(block[k][b])
+                if lowmem:
+                    # free memory associated with the constituent blocks to save memory as we accumulate the merged array                    
+                    block[k][b] = 0
+            rblocks[k][b] = np.concatenate(nbl, axis=axis)
+
     return rblocks
 
 def normalize_features(block, norm=1):
     """ Takes a list of block dictionaries and normalize them (in place)"""
     for k in block:    
         for b in block[k]:
-            block[k][b] *= norm/np.sqrt((block[k][b].reshape((block[k][b].shape[0],-1))**2).sum(axis=1).mean(axis=0))
+            nrm = np.sqrt((block[k][b].reshape((block[k][b].shape[0],-1))**2).sum(axis=1).mean(axis=0))
+            if nrm > 0.0:
+                block[k][b] *= norm/nrm
 
 ###############   SAPH generation #########################
 def compute_saph(fock, over, frame, orbs, sel_types, n_core, orthogonality_threshold=1e-8):
