@@ -6,7 +6,7 @@ from sklearn.model_selection import GridSearchCV
 from sklearn.base import RegressorMixin, BaseEstimator
 from time import time
 import scipy
-from .hamiltonians import orbs_base
+from .hamiltonians import orbs_base, block_to_feat_index
 
 # avoid polluting output with CV failures
 import warnings
@@ -111,9 +111,14 @@ class SAKernelRidge(KernelRidge):
         Xm_flat = np.moveaxis(Xm, -1,1).reshape((-1,Xm.shape[1]))
         K0 = X0_flat@X0_flat.T #np.einsum("iq,jq->ij", X0[...,0], X0[...,0])
         KLMM = (Xm_flat@Xm_flat.T).reshape((Xm.shape[0],Xm.shape[-1],Xm.shape[0],Xm.shape[-1]))  #np.einsum("iqm,jqn->imjn", Xm, Xm)
-
+        
         self.KLscale = np.trace(KLMM.reshape( ((2*self.L+1)*len(Xm),((2*self.L+1)*len(Xm))) ))/len(Xm)
         self.K0scale = np.trace(K0)/len(X0)
+        if self.K0scale == 0.0 :
+            self.K0scale = 1
+        if self.KLscale == 0.0 :
+            self.KLscale = 1
+            
         self.rXm = Xm_flat
         self.rX0 = X0_flat
 
@@ -318,6 +323,7 @@ class SASparseKernelRidge(SparseKernelRidge):
         self.nactive = len(active)
         self.active0 = active0.reshape(active0.shape[:2])
         self.active = np.moveaxis(active, -1,1).reshape((-1,active.shape[1]))
+        
         print("Sparse GPR, for nactive= ", self.nactive)
         start = time()
         K0 = self.active0@self.active0.T
@@ -327,7 +333,11 @@ class SASparseKernelRidge(SparseKernelRidge):
         #KLMM = np.einsum("iqm,jqn->imjn", self.active, self.active)
         self.KLscale = np.trace(KLMM.reshape( ((2*self.L+1)*self.nactive,(2*self.L+1)*self.nactive) ))/self.nactive
         self.K0scale = np.trace(K0)/self.nactive
-
+        if self.K0scale == 0.0 :  # handles gently 0-valued features
+            self.K0scale = 1
+        if self.KLscale == 0.0 :
+            self.KLscale = 1
+            
         Kpoly = KLMM*0.0
         for z, zw in zip(self.zeta, self.zeta_w):
             Kpoly += np.einsum("imjn,ij->imjn",KLMM/self.KLscale, zw*(K0/self.K0scale)**(z-1))
@@ -395,7 +405,6 @@ class SASparseKernelRidge(SparseKernelRidge):
         Y = self._Y_mean + super(SASparseKernelRidge, self).predict(Kpoly.reshape((KLNM.shape[0]*KLNM.shape[1],KLNM.shape[2]*KLNM.shape[3])))
         return Y.reshape((-1, 2*self.L+1))
 
-
 class FockRegression:
     """ Collects all the models that are needed to fit and predict a Fock matrix in coupled-momentum blocks form. """
 
@@ -417,6 +426,9 @@ class FockRegression:
             self.fit_intercept = self._kwargs["fit_intercept"]
         else:
             self.fit_intercept = "auto"
+            
+        if "jitter" in self._kwargs:
+            self.jitter = self._kwargs["jitter"]
 
         if "active" in self._kwargs:
             self.active = self._kwargs["active"]
@@ -458,9 +470,18 @@ class FockRegression:
                         self._kwargs["active"] = self.active[k][fblock]
                         self._kwargs["active0"] = self.active0[k][fblock[:-2]+(0, 1)]
                     tgt = fock_bc[k][orb][L][sl]
-                    self._models[k][orb][L] = self._model_template(L, *self._args, **self._kwargs)
-                    # determines parity of the block
-                    self._models[k][orb][L].fit(feats[k][fblock][sl], tgt, X0=feats[k][fblock[:-2]+(0, 1)][sl])
+                    if "jitter" in self._kwargs:
+                        self._kwargs["jitter"] = self.jitter
+                    try:
+                        self._models[k][orb][L] = self._model_template(L, *self._args, **self._kwargs)
+                        # determines parity of the block                    
+                        self._models[k][orb][L].fit(feats[k][fblock][sl], tgt, X0=feats[k][fblock[:-2]+(0, 1)][sl])
+                    except np.linalg.LinAlgError:
+                        # handles with error in solve due to small jitter
+                        print("solve failure, retrying with larger jitter")
+                        self._kwargs["jitter"] *= 100
+                        self._models[k][orb][L] = self._model_template(L, *self._args, **self._kwargs)
+                        self._models[k][orb][L].fit(feats[k][fblock][sl], tgt, X0=feats[k][fblock[:-2]+(0, 1)][sl])                        
                     self.cv_stats_[(k, orb,L)] = self._models[k][orb][L].cv_stats
 
 
@@ -494,4 +515,51 @@ class FockRegression:
                             fock_bc[k][orb][L] = self._models[k][orb][L].predict(feats[k][(el,elb,L,pi)], X0=feats[k][(el,elb,0,1)])
         return fock_bc
 
+def active_set_selection(feats, blocks, orbs, selector, normalize=True, slices=None):
+    """ Compute active set points for the blocks given. """
 
+    n_to_select = selector.n_to_select  # makes sure the selector has the "right" interface
+    # determines active set 
+    active_feats0 = {}
+    active_feats = {}
+    active_idx = {}
+    for tblock in blocks.keys():
+        active_idx[tblock] = {}
+        active_feats[tblock] = {}
+        active_feats0[tblock] = {}
+        for kblock in blocks[tblock]:
+            # gets the feature block corresponding to the invariant features (l=0, sigma=1)
+            fblock0 = block_to_feat_index(tblock, kblock, 0, orbs)[:-1]+(1,)
+            if slices is None: # if we must only consider a training slice...
+                islice = slice(None)
+            else:
+                islice = slices[tblock][kblock]
+                
+            if fblock0 in active_idx[tblock]:  # reuse indices when available
+                sel_idx = active_idx[tblock][fblock0]
+            else:
+                xblock0 = feats[tblock][fblock0][islice]
+                xblock0 = xblock0.reshape(len(xblock0),-1)
+                if normalize:
+                    mean_sz = np.mean(((xblock0-xblock0.mean(axis=0))**2).sum(axis=1))
+                    if mean_sz > 0:
+                        xblock0 = xblock0/mean_sz
+                selector.n_to_select = min(xblock0.shape[0]-1, n_to_select)
+                try:
+                    selector.fit(xblock0)
+                except np.linalg.LinAlgError:
+                    print(f"Error during selection. Stopping at {len(selector.n_selected_)}/{selector.n_to_select} active points.")
+                except error:
+                    print(f"Uncaught error for {fblock0}, selected {selector.n_selected_}")
+                    raise error                
+                print(f"Selected {selector.n_selected_} for {kblock} [{fblock0}]")
+                sel_idx = selector.selected_idx_[:selector.n_selected_]
+                selector.n_to_select = n_to_select
+            
+            active_idx[tblock][fblock0] = sel_idx
+            active_feats0[tblock][fblock0] = feats[tblock][fblock0][islice][sel_idx]
+            for l in blocks[tblock][kblock]: # these will only generate slices so there's no harm in being redundant
+                fblock = block_to_feat_index(tblock, kblock, l, orbs)
+                active_feats[tblock][fblock] = feats[tblock][fblock][islice][sel_idx]
+                
+    return active_idx, active_feats0, active_feats
