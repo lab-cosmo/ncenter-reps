@@ -407,6 +407,33 @@ def normalize_features(block, norm=1):
             if nrm > 0.0:
                 block[k][b] *= norm/nrm
 
+###############   Error stats     #########################
+def hamiltonian_mse(fock1, fock2, scale=1.0):
+    """ Average element-wise error between Hamiltonians. Normalized so 
+    that in the asymptotic limit (large system size, sparse Hamiltonian)
+    the error is independent on system size """
+    
+    return ((fock1 - fock2)**2).flatten().sum() * scale
+    
+def hamiltonian_mse_blocks(blocks1, blocks2, scale=1.0):
+    """ Average element-wise error between Hamiltonians in block form. 
+    Defined so that the sum over blocks equals the overall MSE in the matrix form.
+    """
+    
+    mse = {}
+    nel = 0
+    for k in blocks1.keys():
+        mse[k] = {}
+        for b in blocks1[k]:
+            na, la, nb, lb = b
+            mse[k][b] = 0            
+            for l in blocks1[k][b]:
+                mse[k][b] +=  ((blocks1[k][b][l] - blocks2[k][b][l]).flatten()**2).sum()
+            if (nb!=na or lb!=la):
+                mse[k][b]*=2.0 # multiplicity
+            mse[k][b]*=scale
+    return mse
+
 ###############   SAPH generation #########################
 def compute_saph(fock, over, frame, orbs, sel_types, n_core, orthogonality_threshold=1e-8):
     """ Computes symmetry-adapted projected Hamiltonian by projecting the
@@ -602,12 +629,6 @@ def compute_hamiltonian_representations(frames, orbs, hypers, lmax, nu, cg, scal
             #del(lrhoij, lrho2)
         tnat+=fnat
 
-    #mid = tracemalloc.take_snapshot()
-    #top_stats = mid.compare_to(before, 'lineno')
-    #print("[ Top 10 differences ]")
-    #for stat in top_stats[:10]:  print(stat)
-
-
     # cleans up combining frames blocks into single vectors - splitting also odd and even blocks
     for k in feats.keys():
         for b in list(feats[k].keys()):
@@ -620,9 +641,5 @@ def compute_hamiltonian_representations(frames, orbs, hypers, lmax, nu, cg, scal
 
             feats[k][b] = block.reshape((block.shape[0], -1, 1+2*b[-2]))
 
-    #then = tracemalloc.take_snapshot()
-    #top_stats = then.compare_to(mid, 'lineno')
-    #print("[ Top 10 differences ]")
-    #for stat in top_stats[:10]:  print(stat)
     return feats
 

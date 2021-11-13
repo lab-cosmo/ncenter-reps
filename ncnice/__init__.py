@@ -4,8 +4,10 @@ from .hamiltonians import ( fix_pyscf_l1, lowdin_orthogonalize, compute_saph,
     block_to_feat_index,
     matrix_list_to_blocks, get_block_idx, blocks_to_matrix_list,
     couple_blocks, blocks_to_matrix, decouple_blocks, 
+    coupled_block_slice,
     compute_hamiltonian_representations, 
     merge_features, normalize_features,
+    hamiltonian_mse, hamiltonian_mse_blocks
     )
 
 from .representations import (
