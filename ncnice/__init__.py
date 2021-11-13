@@ -1,4 +1,4 @@
-from .models import FockRegression
+from .models import FockRegression, active_set_selection
 from .hamiltonians import ( fix_pyscf_l1, lowdin_orthogonalize, compute_saph,
     orbs_base, matrix_to_blocks, matrix_to_ij_indices,
     block_to_feat_index,
