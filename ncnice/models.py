@@ -541,7 +541,7 @@ def active_set_selection(feats, blocks, orbs, selector, normalize=True, slices=N
                 xblock0 = feats[tblock][fblock0][islice]
                 xblock0 = xblock0.reshape(len(xblock0),-1)
                 if normalize:
-                    mean_sz = np.mean(((xblock0-xblock0.mean(axis=0))**2).sum(axis=1))
+                    mean_sz = np.sqrt(np.mean(((xblock0-xblock0.mean(axis=0))**2).sum(axis=1)))
                     if mean_sz > 0:
                         xblock0 = xblock0/mean_sz
                 selector.n_to_select = min(xblock0.shape[0]-1, n_to_select)
