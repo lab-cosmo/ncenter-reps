@@ -551,6 +551,9 @@ def active_set_selection(feats, blocks, orbs, selector, normalize=True, slices=N
                 sel_idx = active_idx[tblock][fblock0]
             else:
                 xblock0 = feats[tblock][fblock0][islice]
+                if len(xblock0) == 0:  # skips zero blocks
+                    print("zero block", tblock, kblock, fblock0)
+                    continue
                 xblock0 = xblock0.reshape(len(xblock0),-1)
                 if normalize:
                     mean_sz = np.sqrt(np.mean(((xblock0-xblock0.mean(axis=0))**2).sum(axis=1)))
