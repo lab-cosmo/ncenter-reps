@@ -283,7 +283,7 @@ def couple_blocks(dcoef, cg):
                 
                 for L in coupled[0].keys():
                     # skips blocks that are zero because of symmetry
-                    if (n1==n2 and l1==l2 and 
+                    if (False and n1==n2 and l1==l2 and 
                        ( ( (dk=="diag" or dk=="offd_p") and  (l1+l2+L)%2==1) or
                          (dk=="offd_m" and (l1+l2+L)%2==0) )
                        ) : continue
@@ -412,7 +412,8 @@ def merge_features(lblocks, axis=0, lowmem=False):
                 if lowmem:
                     # free memory associated with the constituent blocks to save memory as we accumulate the merged array                    
                     block[k][b] = 0
-            rblocks[k][b] = np.concatenate(nbl, axis=axis)
+            if len(nbl)>0:
+                rblocks[k][b] = np.concatenate(nbl, axis=axis)
 
     return rblocks
 
