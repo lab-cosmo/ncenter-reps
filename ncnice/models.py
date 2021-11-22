@@ -46,7 +46,7 @@ class SASplitter:
 class SARidge(Ridge):
     """ Symmetry-adapted ridge regression class """
 
-    def __init__(self, L, alpha=1, alphas=None, cv=2,
+    def __init__(self, L, alpha=1, alphas=None, cv=2, solver='auto',
                  fit_intercept=False, scoring='neg_root_mean_squared_error'):
         self.L = L
         # L>0 components have zero mean by symmetry
@@ -56,7 +56,8 @@ class SARidge(Ridge):
         self.alphas = alphas
         self.cv_stats = None
         self.scoring = scoring
-        super(SARidge, self).__init__(alpha=alpha, fit_intercept=fit_intercept)
+        self.solver = solver
+        super(SARidge, self).__init__(alpha=alpha, fit_intercept=fit_intercept, solver=solver)
 
     def fit(self, Xm, Ym, X0=None):
         # this expects properties in the form [i, m] and features in the form [i, q, m]
@@ -83,7 +84,7 @@ class SAKernelRidge(KernelRidge):
     """ Symmetry-adapted kernel ridge regression class """
 
     def __init__(self, L, zeta=[1], zeta_w=None, cv=2, alpha=1, alphas=None,
-                 fit_intercept=False, scoring='neg_root_mean_squared_error'):
+                 fit_intercept=False, scoring='neg_root_mean_squared_error', solver=None):
         self.L = L
         # L>0 components have zero mean by symmetry
         if L>0:
@@ -181,7 +182,7 @@ class SparseGPRSolver:
         self.relative_jitter = relative_jitter
         self.rkhs_vectors = rkhs_vectors
         self._nM = len(KMM)
-        if self.solver == "RKHS" or self.solver == "RKHS-QR":
+        if self.solver == "RKHS" or self.solver == "RKHS-QR" or self.solver == "RKHS-RIDGE":
             start = time()
             if self.rkhs_vectors is None:
                 vk, Uk = scipy.linalg.eigh(KMM)
@@ -196,10 +197,10 @@ class SparseGPRSolver:
             raise ValueError(
                 "Solver ",
                 solver,
-                " not supported. Possible values are [RKHS, RKHS-QR, QR, Normal].",
+                " not supported. Possible values are [RKHS, RKHS-QR, RKHS-RIDGE, QR, Normal].",
             )
         if relative_jitter:
-            if self.solver == "RKHS" or self.solver == "RKHS-QR":
+            if self.solver == "RKHS" or self.solver == "RKHS-QR" or self.solver == "RKHS-RIDGE":
                 self._jitter_scale = self._vk[0]
             elif self.solver == "QR" or self.solver == "Normal":
                 self._jitter_scale = self._KMM_maxeva
@@ -210,7 +211,7 @@ class SparseGPRSolver:
     def set_regularizers(self, regularizer=1.0, jitter=0.0):
         self.regularizer = regularizer
         self.jitter = jitter
-        if self.solver == "RKHS" or self.solver == "RKHS-QR":
+        if self.solver == "RKHS" or self.solver == "RKHS-QR" or self.solver == "RKHS-RIDGE":
             self._nM = len(np.where(self._vk > self.jitter * self._jitter_scale)[0])
             self._PKPhi = self._Uk[:, : self._nM] * 1 / np.sqrt(self._vk[: self._nM])
         elif self.solver == "QR":
@@ -264,11 +265,12 @@ class SparseGPRSolver:
             Y = Y[:, np.newaxis]
         if self.solver == "RKHS":
             Phi = KNM @ self._PKPhi
-            self._weights = self._PKPhi @ scipy.linalg.solve(
+            rc = scipy.linalg.solve(
                 Phi.T @ Phi + np.eye(self._nM) * self.regularizer,
                 Phi.T @ Y,
                 assume_a="pos",
             )
+            self._weights = self._PKPhi @ rc
         elif self.solver == "RKHS-QR":
             A = np.vstack(
                 [KNM @ self._PKPhi, np.sqrt(self.regularizer) * np.eye(self._nM)]
@@ -277,6 +279,14 @@ class SparseGPRSolver:
             self._weights = self._PKPhi @ scipy.linalg.solve_triangular(
                 R, Q.T @ np.vstack([Y, np.zeros((self._nM, Y.shape[1]))])
             )
+        elif self.solver == "RKHS-RIDGE":
+            Phi = KNM @ self._PKPhi
+            if Phi.shape[1] == 0:
+                self._weights = self._PKPhi@np.zeros(shape=(0,1))
+            else:
+                ridge = Ridge(alpha=self.regularizer,fit_intercept=False, solver='svd')
+                ridge.fit(Phi, Y)
+                self._weights = self._PKPhi @ ridge.coef_.T    
         elif self.solver == "QR":
             A = np.vstack([KNM, self._VMM])
             Q, R = np.linalg.qr(A)
@@ -302,7 +312,7 @@ class SparseKernelRidge(BaseEstimator, SparseGPRSolver):
 class SASparseKernelRidge(SparseKernelRidge):
     """ Symmetry-adapted kernel ridge regression class """
 
-    def __init__(self, L, active, active0, zeta=[1], zeta_w=None, cv=2, alpha=1, alphas=None,
+    def __init__(self, L, active, active0, zeta=[1], zeta_w=None, cv=2, alpha=1, alphas=None, solver="RKHS",
                  fit_intercept=False, jitter=1e-15, scoring='neg_root_mean_squared_error'):
         self.L = L
         # L>0 components have zero mean by symmetry
@@ -319,6 +329,7 @@ class SASparseKernelRidge(SparseKernelRidge):
         self.alphas = alphas
         self.scoring = scoring
         self.fit_intercept = fit_intercept
+        self.solver = solver
 
         self.nactive = len(active)
         self.active0 = active0.reshape(active0.shape[:2])
@@ -346,7 +357,7 @@ class SASparseKernelRidge(SparseKernelRidge):
         start = time()
         self.KLMM_flat = Kpoly.reshape( ((2*self.L+1)*self.nactive,((2*self.L+1)*self.nactive)) )
         super(SASparseKernelRidge, self).__init__(KMM = self.KLMM_flat,
-                                                  regularizer=alpha, jitter=jitter, solver="RKHS")
+                                                  regularizer=alpha, jitter=jitter, solver=self.solver)
         print("KMM init ", time()-start)
 
     def fit(self, Xm, Ym, X0):
