@@ -245,16 +245,20 @@ def blocks_to_matrix(blocks, frame, orbs):
                         unfock[ki+ib:ki+ib+2*lb+1, kj+ia:kj+ia+2*la+1] = blockij.T
                         bidx['diag'][orb] += 1
                     elif (el_a == el_b and i<j):
-                        blockij = (blocks['offd_p'][orb][bidx['offd_p'][orb]]
-                                   +blocks['offd_m'][orb][bidx['offd_m'][orb]])/np.sqrt(2)
-                        blockji = (blocks['offd_p'][orb][bidx['offd_p'][orb]]
-                                   -blocks['offd_m'][orb][bidx['offd_m'][orb]])/np.sqrt(2)
+                        blockij = ( ( blocks['offd_p'][orb][bidx['offd_p'][orb]] if orb in blocks['offd_p'] else 0)
+                                   + ( blocks['offd_m'][orb][bidx['offd_m'][orb]] if orb in blocks['offd_m'] else 0)
+                                   )/np.sqrt(2)
+                        blockji = ( ( blocks['offd_p'][orb][bidx['offd_p'][orb]] if orb in blocks['offd_p'] else 0)
+                                   - ( blocks['offd_m'][orb][bidx['offd_m'][orb]] if orb in blocks['offd_m'] else 0)
+                                   )/np.sqrt(2)
                         unfock[ki+ia:ki+ia+2*la+1, kj+ib:kj+ib+2*lb+1] = blockij
                         unfock[kj+ib:kj+ib+2*lb+1, ki+ia:ki+ia+2*la+1] = blockij.T
                         unfock[kj+ia:kj+ia+2*la+1, ki+ib:ki+ib+2*lb+1] = blockji
                         unfock[ki+ib:ki+ib+2*lb+1, kj+ia:kj+ia+2*la+1] = blockji.T
-                        bidx['offd_p'][orb] += 1
-                        bidx['offd_m'][orb] += 1
+                        if orb in bidx['offd_p']: 
+                            bidx['offd_p'][orb] += 1
+                        if orb in bidx['offd_m']:
+                            bidx['offd_m'][orb] += 1
                     elif (el_a != el_b):
                         blockij = blocks['hete'][orb][bidx['hete'][orb]]
                         unfock[ki+ia:ki+ia+2*la+1, kj+ib:kj+ib+2*lb+1] = blockij
@@ -270,12 +274,19 @@ def couple_blocks(dcoef, cg):
     for dk in dcoef.keys():
         dccoef[dk] = {}
         for k in dcoef[dk].keys():
+            n1, l1, n2, l2 = k
             if len(dcoef[dk][k]) > 0:
                 # computes the coupled representation
                 coupled = [ next(iter(cg.couple(el).values())) for el in dcoef[dk][k] ]
                 # creates the dictionary
                 dccoef[dk][k] = {}
+                
                 for L in coupled[0].keys():
+                    # skips blocks that are zero because of symmetry
+                    if (n1==n2 and l1==l2 and 
+                       ( ( (dk=="diag" or dk=="offd_p") and  (l1+l2+L)%2==1) or
+                         (dk=="offd_m" and (l1+l2+L)%2==0) )
+                       ) : continue
                     dccoef[dk][k][L] = np.asarray([el[L] for el in coupled])
     return dccoef
 
@@ -307,6 +318,9 @@ def matrix_list_to_blocks(focks, frames, orbs, cg, progress = (lambda x: x)):
     for k in blocks.keys():
         slices[0][k] = {}
         for orb in blocks[k]:
+            if len(blocks[k][orb]) == 0:
+                slices[0][k][orb] = slice(0, 0)
+                continue
             L0 = list(blocks[k][orb].keys())[0]
             slices[0][k][orb] = slice(0, len(blocks[k][orb][L0]))
     for ifr in progress(range(1,len(frames))):
@@ -315,6 +329,9 @@ def matrix_list_to_blocks(focks, frames, orbs, cg, progress = (lambda x: x)):
         for k in fc.keys():
             slices[-1][k] = {}
             for orb in fc[k]:
+                if len(fc[k][orb]) == 0:
+                    slices[-1][k][orb] = slice(0, 0)
+                    continue            
                 L0 = list(fc[k][orb].keys())[0]
                 if not orb in blocks[k]:
                     # extend the blocks if more orbital combinations appear
