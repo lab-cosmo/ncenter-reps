@@ -484,16 +484,20 @@ class FockRegression:
                     print(k, orb, fblock, L, np.linalg.norm(tgt))
                     if "jitter" in self._kwargs:
                         self._kwargs["jitter"] = self.jitter
-                    try:
-                        self._models[k][orb][L] = self._model_template(L, *self._args, **self._kwargs)
-                        # X0 has even parity regardless of the parity of the block
-                        self._models[k][orb][L].fit(feats[k][fblock][sl], tgt, X0=feats[k][fblock[:-2]+(0, 1)][sl])
-                    except np.linalg.LinAlgError:
-                        # handles with error in solve due to small jitter
-                        print("FockRegression: solve failure for ",k, str(fblock) , L,", retrying with larger jitter")
-                        self._kwargs["jitter"] *= 100
-                        self._models[k][orb][L] = self._model_template(L, *self._args, **self._kwargs)
-                        self._models[k][orb][L].fit(feats[k][fblock][sl], tgt, X0=feats[k][fblock[:-2]+(0, 1)][sl])                        
+                    
+                    f_solved = False
+                    while not f_solved:
+                        # keep trying to increase the jitter, to deal with really tricky blocks
+                        try:
+                            self._models[k][orb][L] = self._model_template(L, *self._args, **self._kwargs)
+                            # X0 has even parity regardless of the parity of the block
+                            self._models[k][orb][L].fit(feats[k][fblock][sl], tgt, X0=feats[k][fblock[:-2]+(0, 1)][sl])
+                            f_solved = True
+                        except np.linalg.LinAlgError:
+                            # handles with error in solve due to small jitter
+                            print("######################################################\nFockRegression: solve failure for ",k, str(fblock) , L,", retrying with larger jitter\n")
+                            self._kwargs["jitter"] *= 10
+
                     self.cv_stats_[(k, orb,L)] = self._models[k][orb][L].cv_stats
 
 
