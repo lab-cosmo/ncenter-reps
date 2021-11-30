@@ -45,7 +45,7 @@ spex = SphericalExpansion(**spex_hypers)
 mycg = ClebschGordanReal(spex_hypers["max_angular"])
 
 print("Computing optimal radial basis")
-nframes = 1000
+nframes = 100
 frames = read('data/ethanol-structures.xyz',':')[:nframes]
 for f in frames:
     f.cell=[100,100,100]
@@ -73,12 +73,14 @@ ofock_blocks, slices_idx = matrix_list_to_blocks(ofocks, frames, orbs, mycg)
 # training settings
 train_fraction = 0.5
 itrain = np.arange(len(frames))
+np.random.seed(12345)
 np.random.shuffle(itrain)
 ntrain = int(len(itrain)*train_fraction)
 itest = itrain[ntrain:]; itrain=itrain[:ntrain]
 train_slices = get_block_idx(itrain, slices_idx)
+print(itrain)
 
-FR = FockRegression(orbs, alphas=np.geomspace(1e-8, 1e4, 7),
+FR = FockRegression(orbs, alpha = 1e-6, #alphas=np.geomspace(1e-8, 1e4, 7),
                     fit_intercept="auto")
 
 for f in frames:
@@ -112,6 +114,7 @@ mse_test = 0
 for i in itest:
     mse_test += np.sum((pred_ofocks[i] - ofocks[i])**2)/len(ofocks[i])/len(itest)
 
+print("Model size: ", len(FR.cv_stats_))
 print("Train RMSE: ", np.sqrt(mse_train))
 print("Test RMSE: ", np.sqrt(mse_test))
 
@@ -131,25 +134,26 @@ mse_test = 0
 for i in itest:
     mse_test += np.sum((pred_ofocks[i] - ofocks[i])**2)/len(ofocks[i])/len(itest)
 
+print("Model size: ", len(FR.cv_stats_))
 print("Train RMSE: ", np.sqrt(mse_train))
 print("Test RMSE: ", np.sqrt(mse_test))
 
 print("Computing PCA")
 rhoi = compute_rhoi(frames, spex, spex_hypers)
-rhoi_pca, rhoi_pca_eva = compute_rhoi_pca(rhoi, npca=10)
+rhoi_pca, rhoi_pca_eva = compute_rhoi_pca(rhoi, npca=8)
 print("rho_i singular values", rhoi_pca_eva[0]/rhoi_pca_eva[0][0])
 crhoi = apply_rhoi_pca(rhoi, rhoi_pca)
 
-rho2i_pca, rho2i_pca_eva = compute_rho2i_pca(crhoi, mycg, npca=80)
+rho2i_pca, rho2i_pca_eva = compute_rho2i_pca(crhoi, mycg, npca=60)
 print("rho2_i singular values", rho2i_pca_eva[(0,1)]/rho2i_pca_eva[(0,1)][0])
 rho2i_l, prho2i_l = compute_rho2i_lambda(crhoi, spex_hypers["max_angular"], mycg)
 crho2i = apply_rho2i_pca(rho2i_l, prho2i_l, rho2i_pca)
 
-rho1ij_pca, rho1ij_pca_eva = compute_rhoij_pca(frames, spex_hypers, mycg, nu=1, npca=80,
+rho1ij_pca, rho1ij_pca_eva = compute_rhoij_pca(frames, spex_hypers, mycg, nu=1, npca=60,
                     rho1i_pca = rhoi_pca)
 print("rho1_ij singular values", rho1ij_pca_eva[(0,1)]/rho1ij_pca_eva[(0,1)][0])
 
-rho2ij_pca, rho2ij_pca_eva = compute_rhoij_pca(frames, spex_hypers, mycg, nu=2, npca=80,
+rho2ij_pca, rho2ij_pca_eva = compute_rhoij_pca(frames, spex_hypers, mycg, nu=2, npca=60,
                     rho1i_pca = rhoi_pca, rho2i_pca = rho2i_pca)
 print("rho2_ij singular values", rho2ij_pca_eva[(0,1)]/rho2ij_pca_eva[(0,1)][0])
 
@@ -172,6 +176,7 @@ mse_test = 0
 for i in itest:
     mse_test += np.sum((pred_ofocks[i] - ofocks[i])**2)/len(ofocks[i])/len(itest)
 
+print("Model size: ", len(FR.cv_stats_))
 print("Train RMSE: ", np.sqrt(mse_train))
 print("Test RMSE: ", np.sqrt(mse_test))
 
