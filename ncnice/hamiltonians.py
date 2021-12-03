@@ -283,7 +283,7 @@ def couple_blocks(dcoef, cg):
                 
                 for L in coupled[0].keys():
                     # skips blocks that are zero because of symmetry
-                    if (False and n1==n2 and l1==l2 and 
+                    if (n1==n2 and l1==l2 and 
                        ( ( (dk=="diag" or dk=="offd_p") and  (l1+l2+L)%2==1) or
                          (dk=="offd_m" and (l1+l2+L)%2==0) )
                        ) : continue
