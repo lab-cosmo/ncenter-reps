@@ -16,7 +16,7 @@ from .representations import (
    compute_all_rho1i_lambda, compute_all_rho2i_lambda,
    compute_rho0ij_lambda, compute_rho1ij_lambda,
    compute_rho1ijp_lambda, compute_all_rho1ijp_lambda,
-   compute_rho2ij_lambda,
+   compute_rho2ij_lambda, compute_rho11ijp_lambda,
    compute_rhoi_pca, apply_rhoi_pca,
    compute_rho2i_pca, apply_rho2i_pca,
    compute_rhoij_pca, apply_rhoij_pca

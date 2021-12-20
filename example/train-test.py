@@ -99,6 +99,7 @@ rho1ij_l = compute_rho1ij_lambda(rhoi, gij, spex_hypers["max_angular"], mycg)
 rho2ij_l = compute_rho2ij_lambda(rho2i_l_all, gij, spex_hypers["max_angular"], mycg, prho2i_l_all)
 rho1ijp_l = compute_rho1ijp_lambda(rhoi, gij, spex_hypers["max_angular"], mycg)
 rho1ijp_l_all, prho1ijp_l_all = compute_all_rho1ijp_lambda(rhoi, gij, mycg)
+rho11ijp, prho11ijp = compute_rho11ijp_lambda(rhoi, rho1ijp_l_all, spex_hypers["max_angular"], mycg, prho1ijp_l_all)
 
 print("Regression model (nu=0 no PCA)")
 feats_nu0 = compute_hamiltonian_representations(tqdm_reusable(frames, desc="features", leave=False),
