@@ -68,6 +68,22 @@ def compute_rho2i_lambda(rhoi, L, cg):
 
     return rho2ilambda, parity
 
+def compute_rho3i_lambda(rho2i, rhoi, L, cg, prho2i):
+    """ computes |rho^3_i; lm> - lambda-SOAP - using CG utilities from librascal"""
+
+    lmax = int(np.sqrt(rhoi.shape[-1])) -1
+    # can't work out analytically how many terms we have, so we precompute it here
+    nl = 0
+    for l1 in range(lmax + 1):
+        for l2 in range(l1, lmax + 1):  # only need l2>=l1
+            if l2 - l1 > L or l2 + l1 < L:
+                continue
+            nl += 1
+
+    # TODO - adapt to compute bispectrum
+
+    return rho3ilambda, parity
+
 def compute_rho0ij_lambda(rhoi, gij, L, cg,  prfeats = None): # prfeats is (in analogy with rho2ijlambda) the parity, but is not really necessary)
     """ computes |rho^0_{ij}; lm> """
     rho0ij = gij[..., lm_slice(L)].reshape((gij.shape[0], gij.shape[1], -1, 2*L+1))
@@ -274,4 +290,4 @@ def apply_rhoij_pca(rhoij, prhoij, pca):
     cxl = np.moveaxis(np.concatenate(cxl, axis=1).reshape(rhoij.shape[0],rhoij.shape[1],(2*l+1),-1),2,-1)
     pxl = np.hstack(pxl)
     return cxl, pxl
-    
+
