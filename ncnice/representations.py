@@ -68,19 +68,48 @@ def compute_rho2i_lambda(rhoi, L, cg):
 
     return rho2ilambda, parity
 
-def compute_rho3i_lambda(rho2i, rhoi, L, cg, prho2i):
-    """ computes |rho^3_i; lm> - lambda-SOAP - using CG utilities from librascal"""
-
+def compute_rho3i_lambda(rho2i_l, rhoi, L, cg, prho2i_l):
+    """ computes |rho^3_i; lm> - lambda-SOAP - using CG utilities from librascal, takes a dictionary of 
+    rho2i[l] as input"""
+    # TODO - adapt to compute bispectrum
     lmax = int(np.sqrt(rhoi.shape[-1])) -1
     # can't work out analytically how many terms we have, so we precompute it here
     nl = 0
     for l1 in range(lmax + 1):
-        for l2 in range(l1, lmax + 1):  # only need l2>=l1
-            if l2 - l1 > L or l2 + l1 < L:
-                continue
-            nl += 1
-
-    # TODO - adapt to compute bispectrum
+        for l2 in range(l1, lmax + 1): # only need l2>=l1
+            nl1l2=0
+            for k in range(abs(l1-l2), min((l1+l2), lmax+1)): #intermediate coupling
+                nl1l2+=1
+                for l3 in range(l2, lmax + 1): # only need l3>=l2
+                    if abs(k - l3) > L or l3 + k < L:
+                        continue
+    
+                    nl += 1
+        
+    shape = (rhoi.shape[0],
+             rhoi.shape[1],  rhoi.shape[2], 
+             rhoi.shape[1],  rhoi.shape[2],
+             rhoi.shape[1],  rhoi.shape[2],
+             nl, 2*L+1)
+    rho3ilambda = np.zeros(shape)
+    parity = np.ones(nl, dtype = int)*(1-2*(L%2))
+    
+    il = 0
+    for l1 in range(lmax + 1):
+        for l2 in range(l1, lmax + 1): # only need l2>=l1
+            il1l2=0
+            for k in range(abs(l1-l2), min((l1+l2), lmax+1)): #intermediate coupling
+                for l3 in range(l2, lmax + 1): # only need l3>=l2
+                    if abs(l3 - k) > L or l3 + k < L:
+                        continue
+                    print(l1, l2, k, l3, L, il1l2)
+                    rho3ilambda[...,il,:] = mycg.combine_einsum(rhoi[..., lm_slice(l3)], 
+                                                              rho2i_l[k][...,il1l2,:],
+                                                        L, combination_string="ian,iANbM->ianANbM")
+                    parity[il] = prho2i_l[k][il1l2]* (1-2*(l3%2))*(1-2*(k%2))
+                  
+                    il += 1
+                il1l2+=1  
 
     return rho3ilambda, parity
 
