@@ -68,7 +68,7 @@ def compute_rho2i_lambda(rhoi, L, cg):
 
     return rho2ilambda, parity
 
-def compute_rho3i_lambda(rho2i_l, rhoi, L, cg, prho2i):
+def compute_rho3i_lambda(rho2i_l, rhoi, L, cg, prho2i_l):
     """ computes |rho^3_i; lm> - lambda-SOAP - using CG utilities from librascal, takes a dictionary of 
     rho2i[l] as input"""
     # TODO - adapt to compute bispectrum
