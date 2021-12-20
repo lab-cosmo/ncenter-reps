@@ -255,7 +255,7 @@ def blocks_to_matrix(blocks, frame, orbs):
                         unfock[kj+ib:kj+ib+2*lb+1, ki+ia:ki+ia+2*la+1] = blockij.T
                         unfock[kj+ia:kj+ia+2*la+1, ki+ib:ki+ib+2*lb+1] = blockji
                         unfock[ki+ib:ki+ib+2*lb+1, kj+ia:kj+ia+2*la+1] = blockji.T
-                        if orb in bidx['offd_p']: 
+                        if orb in bidx['offd_p']:
                             bidx['offd_p'][orb] += 1
                         if orb in bidx['offd_m']:
                             bidx['offd_m'][orb] += 1
@@ -280,10 +280,10 @@ def couple_blocks(dcoef, cg):
                 coupled = [ next(iter(cg.couple(el).values())) for el in dcoef[dk][k] ]
                 # creates the dictionary
                 dccoef[dk][k] = {}
-                
+
                 for L in coupled[0].keys():
                     # skips blocks that are zero because of symmetry
-                    if (n1==n2 and l1==l2 and 
+                    if (n1==n2 and l1==l2 and
                        ( ( (dk=="diag" or dk=="offd_p") and  (l1+l2+L)%2==1) or
                          (dk=="offd_m" and (l1+l2+L)%2==0) )
                        ) : continue
@@ -331,7 +331,7 @@ def matrix_list_to_blocks(focks, frames, orbs, cg, progress = (lambda x: x)):
             for orb in fc[k]:
                 if len(fc[k][orb]) == 0:
                     slices[-1][k][orb] = slice(0, 0)
-                    continue            
+                    continue
                 L0 = list(fc[k][orb].keys())[0]
                 if not orb in blocks[k]:
                     # extend the blocks if more orbital combinations appear
@@ -410,7 +410,7 @@ def merge_features(lblocks, axis=0, lowmem=False):
                 if len(block[k][b])>0:
                     nbl.append(block[k][b])
                 if lowmem:
-                    # free memory associated with the constituent blocks to save memory as we accumulate the merged array                    
+                    # free memory associated with the constituent blocks to save memory as we accumulate the merged array
                     block[k][b] = 0
             if len(nbl)>0:
                 rblocks[k][b] = np.concatenate(nbl, axis=axis)
@@ -419,7 +419,7 @@ def merge_features(lblocks, axis=0, lowmem=False):
 
 def normalize_features(block, norm=1):
     """ Takes a list of block dictionaries and normalize them (in place)"""
-    for k in block:    
+    for k in block:
         for b in block[k]:
             nrm = np.sqrt((block[k][b].reshape((block[k][b].shape[0],-1))**2).sum(axis=1).mean(axis=0))
             if nrm > 0.0:
@@ -427,24 +427,24 @@ def normalize_features(block, norm=1):
 
 ###############   Error stats     #########################
 def hamiltonian_mse(fock1, fock2, scale=1.0):
-    """ Average element-wise error between Hamiltonians. Normalized so 
+    """ Average element-wise error between Hamiltonians. Normalized so
     that in the asymptotic limit (large system size, sparse Hamiltonian)
     the error is independent on system size """
-    
+
     return ((fock1 - fock2)**2).flatten().sum() * scale
-    
+
 def hamiltonian_mse_blocks(blocks1, blocks2, scale=1.0):
-    """ Average element-wise error between Hamiltonians in block form. 
+    """ Average element-wise error between Hamiltonians in block form.
     Defined so that the sum over blocks equals the overall MSE in the matrix form.
     """
-    
+
     mse = {}
     nel = 0
     for k in blocks1.keys():
         mse[k] = {}
         for b in blocks1[k]:
             na, la, nb, lb = b
-            mse[k][b] = 0            
+            mse[k][b] = 0
             for l in blocks1[k][b]:
                 mse[k][b] +=  ((blocks1[k][b][l] - blocks2[k][b][l]).flatten()**2).sum()
             if (nb!=na or lb!=la):
@@ -506,7 +506,7 @@ def compute_saph(fock, over, frame, orbs, sel_types, n_core, orthogonality_thres
 
 ##############   Features for Hamiltonian learning ############
 def compute_hamiltonian_representations(frames, orbs, hypers, lmax, nu, cg, scale=1,
-                     select_feats = None, half_hete = True,
+                     select_feats = None, half_hete = True, mp_feats = False,
                      rhoi_pca = None, rho2i_pca = None,
                      rhoij_rho2i_pca = None, rhoij_pca = None,
                      verbose = False
@@ -573,7 +573,10 @@ def compute_hamiltonian_representations(frames, orbs, hypers, lmax, nu, cg, scal
                 if nu==0:
                     lrhoij, prhoij = compute_rho0ij_lambda(rhonui, fgij, L, cg, prhonui)
                 elif nu==1:
-                    lrhoij, prhoij = compute_rho1ij_lambda(rhonui, fgij, L, cg, prhonui)
+                    if mp_feats:
+                        lrhoij, prhoij = compute_rho1ijp_lambda(rhonui, fgij, L, cg, prhonui)
+                    else:
+                        lrhoij, prhoij = compute_rho1ij_lambda(rhonui, fgij, L, cg, prhonui)
                 else:
                     lrhoij, prhoij = compute_rho2ij_lambda(rhonui, fgij, L, cg, prhonui)
                 if rhoij_pca is not None:

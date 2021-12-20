@@ -17,6 +17,7 @@ from skcosmo.sample_selection import CUR, FPS
 from ncnice import *
 
 feat_nu = 1
+mp_feats = True
 
 # reads structure and matrices
 frame = read("data/qm7-example-structure.xyz", ":")[0]
@@ -62,7 +63,8 @@ ofock_blocks = matrix_to_blocks(ofock, frame, orbs)
 ofock_coupled = couple_blocks(ofock_blocks, mycg)
 
 print("Computing features")
-feats = compute_hamiltonian_representations([frame], orbs, spherical_expansion_hypers, lambda_max, nu=feat_nu, cg=mycg, scale=1e3)
+feats = compute_hamiltonian_representations([frame], orbs, spherical_expansion_hypers, lambda_max,
+                    nu=feat_nu, cg=mycg, scale=1e3, mp_feats = mp_feats)
 
 print("Fitting model")
 FR = FockRegression(orbs, alpha=1e-8, fit_intercept="auto")
@@ -83,7 +85,8 @@ mywd = WignerDReal(spherical_expansion_hypers["max_angular"], *np.random.uniform
 frame_rot = frame.copy()
 mywd.rotate_frame(frame_rot)
 
-feats_rot = compute_hamiltonian_representations([frame_rot], orbs, spherical_expansion_hypers, lambda_max, nu=feat_nu, cg=mycg, scale=1e3)
+feats_rot = compute_hamiltonian_representations([frame_rot], orbs, spherical_expansion_hypers, lambda_max,
+                    nu=feat_nu, mp_feats = mp_feats, cg=mycg, scale=1e3)
 pred_rot = blocks_to_matrix(decouple_blocks(FR.predict(feats_rot), mycg), frame, orbs)
 print("RMSE Hamiltonian (pred)", np.linalg.norm(pred_rot-pred)/np.sqrt(len(ofock)))
 print("MAE Eigenvalues (pred)", np.mean(np.abs(np.linalg.eigvalsh(pred_rot)-np.linalg.eigvalsh(pred))))
@@ -91,7 +94,8 @@ print("MAE Eigenvalues (pred)", np.mean(np.abs(np.linalg.eigvalsh(pred_rot)-np.l
 print("Checking inversion")
 frame_inv = frame.copy()
 frame_inv.positions = 100-frame.positions
-feats_inv = compute_hamiltonian_representations([frame_inv], orbs, spherical_expansion_hypers, lambda_max, nu=feat_nu, cg=mycg, scale=1e3)
+feats_inv = compute_hamiltonian_representations([frame_inv], orbs, spherical_expansion_hypers, lambda_max,
+                    nu=feat_nu, mp_feats = mp_feats, cg=mycg, scale=1e3)
 pred_inv = blocks_to_matrix(decouple_blocks(FR.predict(feats_inv), mycg), frame, orbs)
 print("RMSE Hamiltonian (pred)", np.linalg.norm(pred_inv-pred)/np.sqrt(len(ofock)))
 print("MAE Eigenvalues (pred)", np.mean(np.abs(np.linalg.eigvalsh(pred_inv)-np.linalg.eigvalsh(pred))))
@@ -102,7 +106,8 @@ np.random.shuffle(iperm)
 frame_prm = frame.copy()
 frame_prm.numbers = frame_prm.numbers[iperm]
 frame_prm.positions = frame_prm.positions[iperm]
-feats_prm = compute_hamiltonian_representations([frame_prm], orbs, spherical_expansion_hypers, lambda_max, nu=feat_nu, cg=mycg, scale=1e3)
+feats_prm = compute_hamiltonian_representations([frame_prm], orbs, spherical_expansion_hypers, lambda_max,
+                    nu=feat_nu, mp_feats = mp_feats, cg=mycg, scale=1e3)
 pred_prm = blocks_to_matrix(decouple_blocks(FR.predict(feats_prm), mycg), frame, orbs)
 print("RMSE Hamiltonian (pred)", np.linalg.norm(pred_prm-pred)/np.sqrt(len(ofock)))
 print("MAE Eigenvalues (pred)", np.mean(np.abs(np.linalg.eigvalsh(pred_prm)-np.linalg.eigvalsh(pred))))

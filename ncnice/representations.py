@@ -151,6 +151,48 @@ def compute_rho1ij_lambda(rhoi, gij, L, cg, prfeats = None): # prfeats is (in an
 
     return rho1ijlambda, parity
 
+def compute_rho1ijp_lambda(rhoi, gij, L, cg, prfeats = None): # prfeats is (in analogy with rho2ijlambda) the parity, but is not really necessary
+    """ computes |rho^1p_{ij}; lm>, i.e. the pair term decorated with the description of the j-atom! """
+
+
+    lmax = int(np.sqrt(gij.shape[-1])) -1
+    # can't work out analytically how many terms we have, so we precompute it here
+    nl = 0
+    for l1 in range(lmax + 1):
+        for l2 in range(lmax + 1):  # |rho_i> and |rho_ij; g> are not symmetric so we need all l2
+            if abs(l2 - l1) > L or l2 + l1 < L:
+                continue
+            nl += 1
+
+    rhoi = rhoi.reshape((rhoi.shape[0], -1, rhoi.shape[-1]))
+    # natom, natom, nel*nmax, nmax, lmax+1, lmax+1, M
+    shape = (rhoi.shape[0], rhoi.shape[0],
+             rhoi.shape[1] , gij.shape[2], nl, 2*L+1)
+    rho1ijplambda = np.zeros(shape)
+    parity = np.ones(nl, dtype = int)*(1-2*(L%2))
+
+    il = 0
+    for l1 in range(lmax+1):
+        for l2 in range(lmax+1):
+            if abs(l2 - l1) > L or l2 + l1 < L:
+                continue
+            rho1ijplambda[:,:,:,:,il] = cg.combine_einsum(rhoi[...,lm_slice(l1)], gij[...,lm_slice(l2)],
+                                                L, combination_string="jn,ijN->ijnN")  # <-- this should be the only difference with the rho1j_lambda implementation!!!
+            parity[il] *= (1-2*(l1%2)) * (1-2*(l2%2))
+            il+=1
+
+    return rho1ijplambda, parity
+
+def compute_all_rho1ijp_lambda(rhoi, gij, cg, rhoijp_pca=None):
+    lmax = int(np.sqrt(rhoi.shape[-1])) -1
+    rhoijp = {}
+    prhoijp = {}
+    for sL in range(lmax+1):
+        rhoijp[sL], prhoijp[sL] = compute_rho1ijp_lambda(rhoi, gij, sL, cg)
+        if rhoijp_pca is not None:
+            rhoijp[sL], prhoijp[sL] = apply_rhoij_pca(rhoijp[sL], prhoijp[sL], rhoijp_pca)
+    return rhoijp, prhoijp
+
 def compute_rho2ij_lambda(rho2i_l, gij, L, cg, prho2i):
     """ computes |rho^2_{ij}; lm> """
 
