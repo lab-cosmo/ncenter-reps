@@ -97,6 +97,8 @@ rho2i_l_all, prho2i_l_all = compute_all_rho2i_lambda(rhoi, mycg)
 rho0ij_l = compute_rho0ij_lambda(rhoi, gij, spex_hypers["max_angular"], mycg)
 rho1ij_l = compute_rho1ij_lambda(rhoi, gij, spex_hypers["max_angular"], mycg)
 rho2ij_l = compute_rho2ij_lambda(rho2i_l_all, gij, spex_hypers["max_angular"], mycg, prho2i_l_all)
+rho1ijp_l = compute_rho1ijp_lambda(rhoi, gij, spex_hypers["max_angular"], mycg)
+rho1ijp_l_all, prho1ijp_l_all = compute_all_rho1ijp_lambda(rhoi, gij, mycg)
 
 print("Regression model (nu=0 no PCA)")
 feats_nu0 = compute_hamiltonian_representations(tqdm_reusable(frames, desc="features", leave=False),
@@ -121,6 +123,26 @@ print("Test RMSE: ", np.sqrt(mse_test))
 print("Regression model (nu=1 no PCA)")
 feats_nu1 = compute_hamiltonian_representations(tqdm_reusable(frames, desc="features", leave=False),
                         orbs, spex_hypers, 2, nu=1, cg=mycg, scale=1e3)
+
+FR.fit(feats_nu1, ofock_blocks, train_slices, progress=tqdm)
+pred_blocks = FR.predict(feats_nu1, progress=tqdm)
+pred_ofocks = blocks_to_matrix_list(pred_blocks, frames, slices_idx, orbs, mycg)
+
+mse_train = 0
+for i in itrain:
+    mse_train += np.sum((pred_ofocks[i] - ofocks[i])**2)/len(ofocks[i])/len(itrain)
+
+mse_test = 0
+for i in itest:
+    mse_test += np.sum((pred_ofocks[i] - ofocks[i])**2)/len(ofocks[i])/len(itest)
+
+print("Model size: ", len(FR.cv_stats_))
+print("Train RMSE: ", np.sqrt(mse_train))
+print("Test RMSE: ", np.sqrt(mse_test))
+
+print("Regression model (nu=1p no PCA)")
+feats_nu1 = compute_hamiltonian_representations(tqdm_reusable(frames, desc="features", leave=False),
+                        orbs, spex_hypers, 2, nu=1, cg=mycg, scale=1e3, mp_feats = True)
 
 FR.fit(feats_nu1, ofock_blocks, train_slices, progress=tqdm)
 pred_blocks = FR.predict(feats_nu1, progress=tqdm)
