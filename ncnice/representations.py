@@ -99,9 +99,9 @@ def compute_rho3i_lambda(rho2i_l, rhoi, L, cg, prho2i_l):
             for k in range(abs(l1-l2), min((l1+l2), lmax+1)+1): #intermediate coupling
                 for l3 in range(l2, lmax + 1): # only need l3>=l2
                     if abs(l3 - k) > L or l3 + k < L:
-                        
+
                         continue
-                    rho3ilambda[...,il,:] = cg.combine_einsum(rhoi[..., lm_slice(l3)], 
+                    rho3ilambda[...,il,:] = cg.combine_einsum(rhoi[..., lm_slice(l3)],
                                                               rho2i_l[k][...,il1l2,:],
                                                         L, combination_string="ian,iANbM->ianANbM")
 
@@ -349,7 +349,7 @@ def compute_all_rho2i_lambda(rhoi, cg, rho2i_pca=None):
             rho2i[sL], prho2i[sL] = apply_rho2i_pca(rho2i[sL], prho2i[sL], rho2i_pca)
     return rho2i, prho2i
 
-def compute_rhoij_pca(frames, hypers, cg, nu, npca, rho1i_pca=None, rho2i_pca=None, lmax=None, progress = (lambda x:x)):
+def compute_rhoij_pca(frames, hypers, cg, nu, npca, rho1i_pca=None, rho2i_pca=None, rhoij_pca=None, lmax=None, mp_feats = False, progress = (lambda x:x)):
     """ computes PCA contraction for pair features. do one frame at a time because of memory """
 
     spex = SphericalExpansion(**hypers)
@@ -367,13 +367,22 @@ def compute_rhoij_pca(frames, hypers, cg, nu, npca, rho1i_pca=None, rho2i_pca=No
         fgij = compute_gij(f, spex_ij, hypers_ij)
         rhonui, prhonui = compute_all_rho1i_lambda(frhoi, cg, rho1i_pca)
         if nu > 1:
-            rhonui, prhonui = compute_all_rho2i_lambda(rhonui, cg, rho2i_pca)
+            if mp_feats:
+                rhonuij, prhonuij = compute_all_rho1ijp_lambda(rhonui, fgij, cg, rhoij_pca)
+            else:
+                rhonui, prhonui = compute_all_rho2i_lambda(rhonui, cg, rho2i_pca)
 
         for l in range(lmax+1):
             if nu==1:
-                lrhoij, prhoij = compute_rho1ij_lambda(rhonui, fgij, l, cg, prhonui)
+                if mp_feats:
+                    lrhoij, prhoij = compute_rho1ijp_lambda(rhonui, fgij, l, cg, prhonui)
+                else:
+                    lrhoij, prhoij = compute_rho1ij_lambda(rhonui, fgij, l, cg, prhonui)
             else:
-                lrhoij, prhoij = compute_rho2ij_lambda(rhonui, fgij, l, cg, prhonui)
+                if mp_feats:
+                    lrhoij, prhoij = compute_rho11ijp_lambda(rhonui, rhonuij, l, cg, prhonuij)
+                else:
+                    lrhoij, prhoij = compute_rho2ij_lambda(rhonui, fgij, l, cg, prhonui)
             for pi in [-1,1]:
                 ipi = np.where(prhoij==pi)[0]
                 if len(ipi) ==0:

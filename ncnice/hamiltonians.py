@@ -553,7 +553,8 @@ def compute_hamiltonian_representations(frames, orbs, hypers, lmax, nu, cg, scal
 
         if (select_feats is None or select_feats["type"]!="diag") and nu == 2:
             if mp_feats:
-                rhonui, prhonui = compute_all_rho1ijp_lambda(frhoi, fgij, cg)
+                # note we abuse rhoij_rho2i_pca to fetch the rho1ijp pca compressor
+                rhonui, prhonui = compute_all_rho1ijp_lambda(frhoi, fgij, cg, rhoij_rho2i_pca)
             else:
                 rhonui, prhonui = compute_all_rho2i_lambda(frhoi, cg, rhoij_rho2i_pca)
         else:
