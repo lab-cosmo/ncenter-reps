@@ -76,7 +76,7 @@ def compute_rho3i_lambda(rho2i_l, rhoi, L, cg, prho2i_l):
     for l1 in range(0,lmax + 1):
         for l2 in range(l1, lmax + 1): # only need l2>=l1
             nl1l2=0
-            for k in range(abs(l1-l2), min((l1+l2), lmax+1)+1): #intermediate coupling
+            for k in range(abs(l1-l2), min((l1+l2), lmax)+1): #intermediate coupling
                 nl1l2+=1
                 for l3 in range(l2, lmax + 1): # only need l3>=l2
                     if abs(k - l3) > L or l3 + k < L:
@@ -95,7 +95,7 @@ def compute_rho3i_lambda(rho2i_l, rhoi, L, cg, prho2i_l):
     for l1 in range(0, lmax + 1):
         for l2 in range(l1, lmax + 1): # only need l2>=l1
             il1l2=0
-            for k in range(abs(l1-l2), min((l1+l2), lmax+1)+1): #intermediate coupling
+            for k in range(abs(l1-l2), min((l1+l2), lmax)+1): #intermediate coupling
                 for l3 in range(l2, lmax + 1): # only need l3>=l2
                     if abs(l3 - k) > L or l3 + k < L:
                         
