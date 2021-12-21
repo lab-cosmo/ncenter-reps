@@ -69,7 +69,8 @@ def compute_rho2i_lambda(rhoi, L, cg):
     return rho2ilambda, parity
 
 def compute_rho3i_lambda(rho2i_l, rhoi, L, cg, prho2i_l):
-    """ computes |rho^3_i; lm> - lambda-SOAP - using CG utilities from librascal, takes a dictionary of rho2i[l] as input"""
+    """ computes |rho^3_i; lm> - lambda-SOAP - using CG utilities from librascal, takes a dictionary of
+    rho2i[l] as input"""
     lmax = int(np.sqrt(rhoi.shape[-1])) -1
     # can't work out analytically how many terms we have, so we precompute it here
     nl = 0
@@ -84,7 +85,7 @@ def compute_rho3i_lambda(rho2i_l, rhoi, L, cg, prho2i_l):
                     nl += 1
 
     shape = (rhoi.shape[0],
-             rhoi.shape[1],  rhoi.shape[2], 
+             rhoi.shape[1],  rhoi.shape[2],
              rhoi.shape[1],  rhoi.shape[2],
              rhoi.shape[1],  rhoi.shape[2],
              nl, 2*L+1)
@@ -98,17 +99,16 @@ def compute_rho3i_lambda(rho2i_l, rhoi, L, cg, prho2i_l):
             for k in range(abs(l1-l2), min((l1+l2), lmax)+1): #intermediate coupling
                 for l3 in range(l2, lmax + 1): # only need l3>=l2
                     if abs(l3 - k) > L or l3 + k < L:
-                        
+
                         continue
-#                     print(l1, l2, k, l3, L, il)
-                    rho3ilambda[...,il,:] = cg.combine_einsum(rhoi[..., lm_slice(l3)], 
+                    rho3ilambda[...,il,:] = cg.combine_einsum(rhoi[..., lm_slice(l3)],
                                                               rho2i_l[k][...,il1l2,:],
                                                         L, combination_string="ian,iANbM->ianANbM")
 
                     parity[il] = prho2i_l[k][il1l2]* (1-2*(l3%2))*(1-2*(k%2))
 
                     il += 1
-                il1l2+=1  
+                il1l2+=1
 
     return rho3ilambda, parity
 
@@ -178,7 +178,6 @@ def compute_rho1ijp_lambda(rhoi, gij, L, cg, prfeats = None): # prfeats is (in a
                                                 L, combination_string="jn,ijN->ijnN")  # <-- this should be the only difference with the rho1j_lambda implementation!!!
             parity[il] *= (1-2*(l1%2)) * (1-2*(l2%2))
             il+=1
-
     return rho1ijplambda, parity
 
 def compute_all_rho1ijp_lambda(rhoi, gij, cg, rhoijp_pca=None):
@@ -190,6 +189,49 @@ def compute_all_rho1ijp_lambda(rhoi, gij, cg, rhoijp_pca=None):
         if rhoijp_pca is not None:
             rhoijp[sL], prhoijp[sL] = apply_rhoij_pca(rhoijp[sL], prhoijp[sL], rhoijp_pca)
     return rhoijp, prhoijp
+
+
+def compute_rho11ijp_lambda(rhoi, rhoij_l, L, cg, prfeats):
+    """ computes |rho^11p_{ij}; lm>, i.e. the pair term decorated with the description of the j-atom AND the i-atom! """
+
+    lmax = int(np.sqrt(rhoi.shape[-1])) -1
+
+    # "flatten" rhoij_l
+    nrhoij = {}
+    for l2 in range(lmax+1):
+        nrhoij[l2] = rhoij_l[l2].reshape(rhoij_l[l2].shape[:2]+(-1,)+rhoij_l[l2].shape[-2:])
+    rhoij_l = nrhoij
+
+    # "flatten" rhoi
+    rhoi = rhoi.reshape((rhoi.shape[0], -1, rhoi.shape[-1]))
+
+    # can't work out analytically how many terms we have, so we precompute it here
+    nl = 0
+    for l1 in range(lmax+1):
+        for l2 in range(lmax+1):   # can't use symmetry when combining rhoi and rhoij features
+            if abs(l2 - l1) > L or l2 + l1 < L:
+                continue
+            nl += rhoij_l[l1].shape[-2]   # l-soap indices
+
+    # natom, natom, nel, nmax, nrhoij, nl, M
+    # if we do PCA, all the rho2 indices are collapsed
+    shape = rhoij_l[0].shape[:3] + (rhoi.shape[1], nl, 2*L+1)
+
+    rho11ijp = np.zeros(shape)
+    prho11ijp = np.zeros(nl)
+
+    jl = 0
+    for l1 in range(lmax+1):
+        n2j = rhoij_l[l1].shape[-2]
+        for l2 in range(lmax+1):   # can't use symmetry when combining rhoi and rhoij features
+            if abs(l2 - l1) > L or l2 + l1 < L:
+                continue
+            rho11ijp[...,jl:jl+n2j,:] = cg.combine_einsum(rhoij_l[l1][...], rhoi[...,lm_slice(l2)],
+                                                L, combination_string="ijkf,iq->ijkqf")
+            prho11ijp[jl:jl+n2j] = prfeats[l1] * (1-2*(l1%2)) * (1-2*(l2%2))
+            jl += n2j
+    prho11ijp *= (1-2*(L%2))
+    return rho11ijp, prho11ijp
 
 def compute_rho2ij_lambda(rho2i_l, gij, L, cg, prho2i):
     """ computes |rho^2_{ij}; lm> """
@@ -307,7 +349,7 @@ def compute_all_rho2i_lambda(rhoi, cg, rho2i_pca=None):
             rho2i[sL], prho2i[sL] = apply_rho2i_pca(rho2i[sL], prho2i[sL], rho2i_pca)
     return rho2i, prho2i
 
-def compute_rhoij_pca(frames, hypers, cg, nu, npca, rho1i_pca=None, rho2i_pca=None, lmax=None, progress = (lambda x:x)):
+def compute_rhoij_pca(frames, hypers, cg, nu, npca, rho1i_pca=None, rho2i_pca=None, rhoij_pca=None, lmax=None, mp_feats = False, progress = (lambda x:x)):
     """ computes PCA contraction for pair features. do one frame at a time because of memory """
 
     spex = SphericalExpansion(**hypers)
@@ -325,13 +367,22 @@ def compute_rhoij_pca(frames, hypers, cg, nu, npca, rho1i_pca=None, rho2i_pca=No
         fgij = compute_gij(f, spex_ij, hypers_ij)
         rhonui, prhonui = compute_all_rho1i_lambda(frhoi, cg, rho1i_pca)
         if nu > 1:
-            rhonui, prhonui = compute_all_rho2i_lambda(rhonui, cg, rho2i_pca)
+            if mp_feats:
+                rhonuij, prhonuij = compute_all_rho1ijp_lambda(rhonui, fgij, cg, rhoij_pca)
+            else:
+                rhonui, prhonui = compute_all_rho2i_lambda(rhonui, cg, rho2i_pca)
 
         for l in range(lmax+1):
             if nu==1:
-                lrhoij, prhoij = compute_rho1ij_lambda(rhonui, fgij, l, cg, prhonui)
+                if mp_feats:
+                    lrhoij, prhoij = compute_rho1ijp_lambda(rhonui, fgij, l, cg, prhonui)
+                else:
+                    lrhoij, prhoij = compute_rho1ij_lambda(rhonui, fgij, l, cg, prhonui)
             else:
-                lrhoij, prhoij = compute_rho2ij_lambda(rhonui, fgij, l, cg, prhonui)
+                if mp_feats:
+                    lrhoij, prhoij = compute_rho11ijp_lambda(rhonui, rhonuij, l, cg, prhonuij)
+                else:
+                    lrhoij, prhoij = compute_rho2ij_lambda(rhonui, fgij, l, cg, prhonui)
             for pi in [-1,1]:
                 ipi = np.where(prhoij==pi)[0]
                 if len(ipi) ==0:

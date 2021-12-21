@@ -552,7 +552,11 @@ def compute_hamiltonian_representations(frames, orbs, hypers, lmax, nu, cg, scal
         fgij = compute_gij(f, spex_ij, hypers_ij)*scale
 
         if (select_feats is None or select_feats["type"]!="diag") and nu == 2:
-            rhonui, prhonui = compute_all_rho2i_lambda(frhoi, cg, rhoij_rho2i_pca)
+            if mp_feats:
+                # note we abuse rhoij_rho2i_pca to fetch the rho1ijp pca compressor
+                rhonui, prhonui = compute_all_rho1ijp_lambda(frhoi, fgij, cg, rhoij_rho2i_pca)
+            else:
+                rhonui, prhonui = compute_all_rho2i_lambda(frhoi, cg, rhoij_rho2i_pca)
         else:
             rhonui, prhonui = frhoi, None
 
@@ -578,7 +582,10 @@ def compute_hamiltonian_representations(frames, orbs, hypers, lmax, nu, cg, scal
                     else:
                         lrhoij, prhoij = compute_rho1ij_lambda(rhonui, fgij, L, cg, prhonui)
                 else:
-                    lrhoij, prhoij = compute_rho2ij_lambda(rhonui, fgij, L, cg, prhonui)
+                    if mp_feats:
+                        lrhoij, prhoij = compute_rho11ijp_lambda(frhoi, rhonui, L, cg, prhonui)
+                    else:
+                        lrhoij, prhoij = compute_rho2ij_lambda(rhonui, fgij, L, cg, prhonui)
                 if rhoij_pca is not None:
                     lrhoij, prhoij = apply_rhoij_pca(lrhoij, prhoij, rhoij_pca)
 

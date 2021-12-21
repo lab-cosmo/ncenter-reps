@@ -29,7 +29,7 @@ from ncnice import *
 print("Init CGs")
 spex_hypers = {
     "interaction_cutoff": 5,
-    "max_radial": 5,
+    "max_radial": 4,
     "max_angular": 3,
     "gaussian_sigma_constant": 0.3,
     "gaussian_sigma_type": "Constant",
@@ -99,6 +99,7 @@ rho1ij_l = compute_rho1ij_lambda(rhoi, gij, spex_hypers["max_angular"], mycg)
 rho2ij_l = compute_rho2ij_lambda(rho2i_l_all, gij, spex_hypers["max_angular"], mycg, prho2i_l_all)
 rho1ijp_l = compute_rho1ijp_lambda(rhoi, gij, spex_hypers["max_angular"], mycg)
 rho1ijp_l_all, prho1ijp_l_all = compute_all_rho1ijp_lambda(rhoi, gij, mycg)
+rho11ijp, prho11ijp = compute_rho11ijp_lambda(rhoi, rho1ijp_l_all, spex_hypers["max_angular"], mycg, prho1ijp_l_all)
 
 print("Regression model (nu=0 no PCA)")
 feats_nu0 = compute_hamiltonian_representations(tqdm_reusable(frames, desc="features", leave=False),
@@ -179,6 +180,15 @@ rho2ij_pca, rho2ij_pca_eva = compute_rhoij_pca(frames, spex_hypers, mycg, nu=2, 
                     rho1i_pca = rhoi_pca, rho2i_pca = rho2i_pca)
 print("rho2_ij singular values", rho2ij_pca_eva[(0,1)]/rho2ij_pca_eva[(0,1)][0])
 
+rho1ijp_pca, rho1ijp_pca_eva = compute_rhoij_pca(frames, spex_hypers, mycg, nu=1, npca=60,
+                    rho1i_pca = rhoi_pca, mp_feats = True)
+print("rho1_ijp singular values", rho1ij_pca_eva[(0,1)]/rho1ij_pca_eva[(0,1)][0])
+
+
+rho11pij_pca, rho11pij_pca_eva = compute_rhoij_pca(frames, spex_hypers, mycg, nu=2, npca=60,
+                    rho1i_pca = rhoi_pca, rho2i_pca = rho2i_pca, rhoij_pca = rho1ijp_pca, mp_feats=True)
+print("rho11p_ij singular values", rho11pij_pca_eva[(0,1)]/rho11pij_pca_eva[(0,1)][0])
+
 print("Regression model (nu=2, with PCA)")
 feats_nu2 = compute_hamiltonian_representations(tqdm_reusable(frames, desc="features", leave=False),
                         orbs, spex_hypers, 2, nu=2, cg=mycg, scale=1e3,
@@ -220,3 +230,28 @@ for i in itest:
 
 print("Train RMSE: ", np.sqrt(mse_train))
 print("Test RMSE: ", np.sqrt(mse_test))
+
+
+print("Regression model (MP nu=2, PCA)")
+feats_nu11p = compute_hamiltonian_representations(tqdm_reusable(frames, desc="features", leave=False),
+                        orbs, spex_hypers, 2, nu=2, cg=mycg, scale=1e3, mp_feats=True,
+                        rhoi_pca = rhoi_pca, rho2i_pca = rho2i_pca, rhoij_rho2i_pca=rho1ijp_pca,
+                        rhoij_pca = rho11pij_pca
+                        )
+
+FR.fit(feats_nu11p, ofock_blocks, train_slices, progress=tqdm)
+pred_blocks = FR.predict(feats_nu11p, progress=tqdm)
+pred_ofocks = blocks_to_matrix_list(pred_blocks, frames, slices_idx, orbs, mycg)
+
+mse_train = 0
+for i in itrain:
+    mse_train += np.sum((pred_ofocks[i] - ofocks[i])**2)/len(ofocks[i])/len(itrain)
+
+mse_test = 0
+for i in itest:
+    mse_test += np.sum((pred_ofocks[i] - ofocks[i])**2)/len(ofocks[i])/len(itest)
+
+print("Model size: ", len(FR.cv_stats_))
+print("Train RMSE: ", np.sqrt(mse_train))
+print("Test RMSE: ", np.sqrt(mse_test))
+#rho1ijp_l = compute_rho1ijp_lambda(rhoi, gij, spex_hypers["max_angular"], mycg)

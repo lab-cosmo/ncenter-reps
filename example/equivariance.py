@@ -16,7 +16,7 @@ from skcosmo.sample_selection import CUR, FPS
 
 from ncnice import *
 
-feat_nu = 1
+feat_nu = 2
 mp_feats = True
 
 # reads structure and matrices
@@ -44,12 +44,13 @@ ofock = lowdin_orthogonalize(fock, over)
 # spherical expansion parameters
 spherical_expansion_hypers = {
     "interaction_cutoff": 5,
-    "max_radial": 6,
+    "max_radial": 4,
     "max_angular": 4,
     "gaussian_sigma_constant": 0.3,
     "gaussian_sigma_type": "Constant",
     "cutoff_smooth_width": 0.5,
     "radial_basis": "GTO",
+
     "global_species": [1,6,7,8],
     "cutoff_function_type": "RadialScaling",
     "cutoff_function_parameters": {"rate": 2, "scale": 1, "exponent": 2},
