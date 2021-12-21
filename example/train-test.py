@@ -240,7 +240,7 @@ feats_nu11p = compute_hamiltonian_representations(tqdm_reusable(frames, desc="fe
                         )
 
 FR.fit(feats_nu11p, ofock_blocks, train_slices, progress=tqdm)
-pred_blocks = FR.predict(feats_nu2, progress=tqdm)
+pred_blocks = FR.predict(feats_nu11p, progress=tqdm)
 pred_ofocks = blocks_to_matrix_list(pred_blocks, frames, slices_idx, orbs, mycg)
 
 mse_train = 0
