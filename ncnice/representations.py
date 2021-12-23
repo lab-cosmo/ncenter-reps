@@ -413,3 +413,15 @@ def apply_rhoij_pca(rhoij, prhoij, pca):
     pxl = np.hstack(pxl)
     return cxl, pxl
 
+
+def contract_rhoij(rhoij, prhoij, symbols, elements):
+    """ Contracts |rho_ij> over j, creating separate channels for the different species """
+
+    shape = rhoij.shape
+    shape = (shape[0], len(elements)) + shape[2:]
+    rhoi = np.zeros(shape)
+    for ie, e in enumerate(elements):
+        we = np.where(symbols==e)[0]
+        rhoi[:,ie] = rhoij[:,we].sum(axis=1)
+    
+    return rhoi.reshape( (shape[0], shape[1]*shape[2])+shape[3:]  ), prhoij

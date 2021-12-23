@@ -19,5 +19,6 @@ from .representations import (
    compute_rho2ij_lambda, compute_rho11ijp_lambda,
    compute_rhoi_pca, apply_rhoi_pca,
    compute_rho2i_pca, apply_rho2i_pca,
-   compute_rhoij_pca, apply_rhoij_pca
+   compute_rhoij_pca, apply_rhoij_pca, 
+   contract_rhoij,
     )

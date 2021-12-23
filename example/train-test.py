@@ -100,6 +100,7 @@ rho2ij_l = compute_rho2ij_lambda(rho2i_l_all, gij, spex_hypers["max_angular"], m
 rho1ijp_l = compute_rho1ijp_lambda(rhoi, gij, spex_hypers["max_angular"], mycg)
 rho1ijp_l_all, prho1ijp_l_all = compute_all_rho1ijp_lambda(rhoi, gij, mycg)
 rho11ijp, prho11ijp = compute_rho11ijp_lambda(rhoi, rho1ijp_l_all, spex_hypers["max_angular"], mycg, prho1ijp_l_all)
+rho11P, prho11P = contract_rhoij(rho11ijp, prho11ijp, frames[0].symbols, ["H", "C", "O"])
 
 print("Regression model (nu=0 no PCA)")
 feats_nu0 = compute_hamiltonian_representations(tqdm_reusable(frames, desc="features", leave=False),
@@ -180,7 +181,7 @@ rho2ij_pca, rho2ij_pca_eva = compute_rhoij_pca(frames, spex_hypers, mycg, nu=2, 
                     rho1i_pca = rhoi_pca, rho2i_pca = rho2i_pca)
 print("rho2_ij singular values", rho2ij_pca_eva[(0,1)]/rho2ij_pca_eva[(0,1)][0])
 
-rho1ijp_pca, rho1ijp_pca_eva = compute_rhoij_pca(frames, spex_hypers, mycg, nu=1, npca=60,
+rho1ijp_pca, rho1ijp_pca_eva = compute_rhoij_pca(frames, spex_hypers, mycg, nu=1, npca=30,
                     rho1i_pca = rhoi_pca, mp_feats = True)
 print("rho1_ijp singular values", rho1ij_pca_eva[(0,1)]/rho1ij_pca_eva[(0,1)][0])
 

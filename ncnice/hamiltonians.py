@@ -560,6 +560,7 @@ def compute_hamiltonian_representations(frames, orbs, hypers, lmax, nu, cg, scal
         else:
             rhonui, prhonui = frhoi, None
 
+        crhoi = None
         for L in range(lmax+1):
             if select_feats is not None and L>0 and select_feats["block"][-2] != L:
                 continue
@@ -588,6 +589,8 @@ def compute_hamiltonian_representations(frames, orbs, hypers, lmax, nu, cg, scal
                         lrhoij, prhoij = compute_rho2ij_lambda(rhonui, fgij, L, cg, prhonui)
                 if rhoij_pca is not None:
                     lrhoij, prhoij = apply_rhoij_pca(lrhoij, prhoij, rhoij_pca)
+                
+                crhoi, pcrhoi = contract_rhoij(lrhoij, prhoij, els, f.symbols)
 
             for i, el in enumerate(els):
                 iel = np.where(f.symbols==el)[0]
@@ -603,6 +606,15 @@ def compute_hamiltonian_representations(frames, orbs, hypers, lmax, nu, cg, scal
                         feats['diag'][(el, L, pi)].append(np.zeros(shape=(len(iel), 1, 2*L+1)))
                         continue
                     feats['diag'][(el, L, pi)].append(lrhonui[...,wherepi,:][iel].reshape((len(iel), -1, 2*L+1) ) )
+
+                if crhoi is not None:
+                    wherepi = np.where(pcrhoi==pi)[0]
+                    if len(wherepi)==0:
+                        continue
+                    feats['diag'][(el, L, pi)][-1] = np.concatenate([
+                            feats['diag'][(el, L, pi)][-1],
+                            crhoi[...,wherepi,:][iel].reshape( (len(iel), -1, 2*L+1) )
+                            ], axis=-2)
 
                 if select_feats is not None and select_feats["type"]=="diag":
                     continue
