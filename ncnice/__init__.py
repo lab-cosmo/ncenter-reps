@@ -12,7 +12,7 @@ from .hamiltonians import ( fix_pyscf_l1, lowdin_orthogonalize, compute_saph,
 
 from .representations import (
    compute_gij, compute_rhoi, compute_rho1ij,
-   compute_rho1i_lambda, compute_rho2i_lambda,
+   compute_rho1i_lambda, compute_rho2i_lambda, compute_rho3i_lambda,
    compute_all_rho1i_lambda, compute_all_rho2i_lambda,
    compute_rho0ij_lambda, compute_rho1ij_lambda,
    compute_rho1ijp_lambda, compute_all_rho1ijp_lambda,
