@@ -31,7 +31,7 @@ spex_hypers = {
 
 mycg = ClebschGordanReal(spex_hypers["max_angular"])
 
-data = 'data/bispectrum.xyz'
+data = 'data/powerspectrum-triplet.xyz'
 print("Computing optimal radial basis")
 frames = read(data,':')
 for f in frames:
@@ -62,7 +62,7 @@ feats = {
     "rho_ij^2;00" : [],
     "rho_ij^(0,1);00" : [],
     "rho_ij^(1,1);00" : [],
-    "rho_ij^(1<-1);00" : [],
+    "rho_i^(1<-1);00" : [],
 }
 
 for f in frames:
@@ -86,14 +86,11 @@ for f in frames:
     rho11ijp, prho11ijp = compute_rho11ijp_lambda(rhoi, rho1ijp_l_all, 0, mycg, prho1ijp_l_all)
     feats["rho_ij^(1,1);00"].append(rho11ijp[...,np.where(prho11ijp==1)[0],:])
     rho11P, prho11P = contract_rhoij(rho11ijp, prho11ijp, frames[0].symbols, ["H", "C", "O"])
-    feats["rho_ij^(1<-1);00"].append(rho11P[...,np.where(prho11P==1)[0],:])
+    feats["rho_i^(1<-1);00"].append(rho11P[...,np.where(prho11P==1)[0],:])
     
-
-
-
 for k in feats:
-    print(f"Environment distances from frame 1, features type: {k}")
-    for f in range(1,len(frames)):
+    print(f"Environment distances from frame 0, features type: {k}")
+    for f in range(1,len(frames)):        
         print(np.sqrt(
             ((feats[k][0]-feats[k][f])**2).reshape(
                (len(feats[k][f]),-1)).sum(axis=1)/
