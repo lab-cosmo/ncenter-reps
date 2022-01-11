@@ -590,7 +590,7 @@ def compute_hamiltonian_representations(frames, orbs, hypers, lmax, nu, cg, scal
                 if rhoij_pca is not None:
                     lrhoij, prhoij = apply_rhoij_pca(lrhoij, prhoij, rhoij_pca)
                 
-                crhoi, pcrhoi = contract_rhoij(lrhoij, prhoij, els, f.symbols)
+                crhoi, pcrhoi = contract_rhoij(lrhoij, prhoij, f.symbols, els)
 
             for i, el in enumerate(els):
                 iel = np.where(f.symbols==el)[0]
