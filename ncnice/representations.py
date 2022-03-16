@@ -33,7 +33,7 @@ def compute_rho1i_lambda(rhoi, L, cg):
     """ computes |rho^1_i; lm>, one-center, radial equivariant (just a slice of the <nlm|rhoi>"""
     # natom, nel, nmax, lmax+1
     rhoi = rhoi.reshape((rhoi.shape[0], -1, rhoi.shape[-1]))
-    parity = np.ones(rhoi.shape[1])
+    parity = np.ones(rhoi.shape[1]) #spherical harmonics like components have parity 1 by our defintion since they are polar tensors
     return rhoi[..., lm_slice(L)], parity
 
 def compute_rho2i_lambda(rhoi, L, cg):
@@ -68,10 +68,12 @@ def compute_rho2i_lambda(rhoi, L, cg):
 
     return rho2ilambda, parity
 
+
 def compute_rho3i_lambda(rho2i_l, rhoi, L, cg, prho2i_l):
     """ computes |rho^3_i; lm> - lambda-SOAP - using CG utilities from librascal, takes a dictionary of
     rho2i[l] as input"""
     lmax = int(np.sqrt(rhoi.shape[-1])) -1
+    index_l1l2={k:[] for k in range(lmax+1)} #to keep track of which (l1,l2) pair for given k
     # can't work out analytically how many terms we have, so we precompute it here
     nl = 0
     for l1 in range(0,lmax + 1):
@@ -79,6 +81,7 @@ def compute_rho3i_lambda(rho2i_l, rhoi, L, cg, prho2i_l):
             nl1l2=0
             for k in range(abs(l1-l2), min((l1+l2), lmax)+1): #intermediate coupling
                 nl1l2+=1
+                index_l1l2[k].append((l1,l2))
                 for l3 in range(l2, lmax + 1): # only need l3>=l2
                     if abs(k - l3) > L or l3 + k < L:
                         continue
@@ -95,18 +98,20 @@ def compute_rho3i_lambda(rho2i_l, rhoi, L, cg, prho2i_l):
     il = 0
     for l1 in range(0, lmax + 1):
         for l2 in range(l1, lmax + 1): # only need l2>=l1
-            il1l2=0
             for k in range(abs(l1-l2), min((l1+l2), lmax)+1): #intermediate coupling
                 for l3 in range(l2, lmax + 1): # only need l3>=l2
                     if abs(l3 - k) > L or l3 + k < L:
 
                         continue
+                    il1l2=  index_l1l2[k].index((l1,l2))
+                    #print(l1, l2,k, il1l2)
                     rho3ilambda[...,il,:] = cg.combine_einsum(rhoi[..., lm_slice(l3)],
                                                               rho2i_l[k][...,il1l2,:],
                                                         L, combination_string="ian,iANbM->ianANbM")
 
-                    parity[il] = prho2i_l[k][il1l2]* (1-2*(l3%2))*(1-2*(k%2))
+                    parity[il] *= prho2i_l[k][il1l2]*(1-2*(l3%2))*(1-2*(k%2))
 
+                    #print('l1, l2, k, l3, prho2, p, expected', l1, l2, k,l3,prho2i_l[k][il1l2], parity[il], (-1)**(l1+l2+l3+L))
                     il += 1
                 il1l2+=1
 
